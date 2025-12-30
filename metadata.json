@@ -1,0 +1,8 @@
+
+{
+  "name": "Day 🧵",
+  "description": "Une application élégante pour organiser vos événements mensuels en un clin d'œil.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
