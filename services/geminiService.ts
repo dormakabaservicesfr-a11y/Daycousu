@@ -8,17 +8,17 @@ export const generateEventIdeas = async (
   userProvidedName?: string,
   usedIcons: string[] = []
 ): Promise<GeminiEventResponse> => {
-  // On récupère la clé de manière sécurisée sans planter si process est undefined
-  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+  // On utilise directement la clé de l'environnement
+  const apiKey = process.env.API_KEY;
   
-  // Si pas de clé, on utilise directement le fallback pour ne pas faire attendre l'utilisateur
+  // Si vraiment aucune clé n'est présente, on garde un fallback discret mais fonctionnel
   if (!apiKey) {
-    console.warn("API_KEY manquante. Utilisation du mode sans IA.");
+    console.error("ERREUR : La variable d'environnement API_KEY est introuvable. Vérifiez vos paramètres Vercel.");
     return {
       title: userProvidedName || `${type} de ${month}`,
       date: `Le 15 ${month}`,
-      description: "Événement créé en mode local (IA non configurée).",
-      icon: "📅",
+      description: "L'IA est prête mais la clé API n'est pas détectée sur Vercel. Vérifiez vos variables d'environnement.",
+      icon: "⚙️",
       maxParticipants: 4
     };
   }
@@ -27,16 +27,21 @@ export const generateEventIdeas = async (
   
   const basePrompt = userProvidedName 
     ? `L'utilisateur veut organiser un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
-    : `Génère une idée d'événement créative pour le mois de ${month} de type "${type}".`;
+    : `Génère une idée d'événement créative et originale pour le mois de ${month} de type "${type}".`;
 
   const exclusionPrompt = usedIcons.length > 0 
-    ? `IMPORTANT : Ne choisis PAS un émoji parmi la liste suivante : ${usedIcons.join(', ')}.`
+    ? `IMPORTANT : Ne choisis PAS un émoji parmi ceux-ci : ${usedIcons.join(', ')}.`
     : '';
 
   const prompt = `${basePrompt} 
-    Propose une date précise, une description attrayante (2 phrases max), un émoji unique, et un nombre de participants (4 par défaut). 
+    Propose :
+    1. Un titre accrocheur.
+    2. Une date précise (ex: "Samedi 14 ${month}").
+    3. Une description très courte et fun (max 150 caractères).
+    4. Un émoji unique en rapport direct avec l'activité.
+    5. Un nombre maximum de participants logique.
     ${exclusionPrompt}
-    Réponds uniquement au format JSON pur.`;
+    Réponds uniquement au format JSON.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -59,14 +64,19 @@ export const generateEventIdeas = async (
     });
 
     const text = response.text || "{}";
-    const cleanedJson = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(cleanedJson);
+    return JSON.parse(text);
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error("Erreur lors de l'appel Gemini:", error);
+    
+    // Si l'erreur est liée à une clé invalide ou manquante
+    const errorMessage = error?.message?.includes("API key not found") 
+      ? "Clé API non trouvée. Vérifiez Vercel." 
+      : "Gemini est temporairement indisponible.";
+
     return {
       title: userProvidedName || `${type} de ${month}`,
-      date: `Le 15 ${month}`,
-      description: "Un événement généré faute de réponse de l'IA.",
+      date: `Courant ${month}`,
+      description: errorMessage,
       icon: "📅",
       maxParticipants: 4
     };
@@ -74,7 +84,7 @@ export const generateEventIdeas = async (
 };
 
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
-  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+  const apiKey = process.env.API_KEY;
   if (!apiKey) return { name: "Lieu à définir" };
 
   const ai = new GoogleGenAI({ apiKey });
@@ -82,14 +92,14 @@ export const suggestLocation = async (eventTitle: string, month: string): Promis
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Propose un lieu précis pour l'événement "${eventTitle}" en ${month}.`,
+      contents: `Où pourrait-on organiser l'événement "${eventTitle}" en ${month} ? Sois précis.`,
       config: {
         tools: [{ googleMaps: {} }],
       },
     });
 
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    const mapsChunk = groundingChunks?.find(chunk => chunk.maps);
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    const mapsChunk = chunks?.find(chunk => chunk.maps);
 
     if (mapsChunk) {
       return {
@@ -98,7 +108,7 @@ export const suggestLocation = async (eventTitle: string, month: string): Promis
       };
     }
   } catch (error) {
-    console.warn("Location suggestion error:", error);
+    console.warn("Erreur suggestion lieu:", error);
   }
   return { name: "Lieu à définir" };
 };
