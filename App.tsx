@@ -1,10 +1,12 @@
 
-import React, { useState } from 'react';
-import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants';
-import { EventType, EventData } from './types';
-import { generateEventIdeas, suggestLocation } from './services/geminiService';
-import EventBubble from './components/EventBubble';
-import RegistrationModal from './components/RegistrationModal';
+import React, { useState, useEffect } from 'react';
+import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants.tsx';
+import { EventType, EventData } from './types.ts';
+import { generateEventIdeas, suggestLocation } from './services/geminiService.ts';
+import EventBubble from './components/EventBubble.tsx';
+import RegistrationModal from './components/RegistrationModal.tsx';
+
+const STORAGE_KEY = 'day_app_events_v1';
 
 const App: React.FC = () => {
   const [events, setEvents] = useState<EventData[]>([]);
@@ -14,6 +16,27 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
 
+  // Charger les événements au montage du composant
+  useEffect(() => {
+    try {
+      const savedEvents = localStorage.getItem(STORAGE_KEY);
+      if (savedEvents) {
+        setEvents(JSON.parse(savedEvents));
+      }
+    } catch (err) {
+      console.error("Erreur lors du chargement des événements :", err);
+    }
+  }, []);
+
+  // Sauvegarder les événements à chaque modification
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    } catch (err) {
+      console.error("Erreur lors de la sauvegarde des événements :", err);
+    }
+  }, [events]);
+
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType) return;
 
@@ -22,10 +45,9 @@ const App: React.FC = () => {
       const usedIcons = events.map(e => e.icon);
       
       const idea = await generateEventIdeas(selectedMonth, selectedType, inputName, usedIcons);
+      
       const finalTitle = inputName.trim() || idea.title;
       const location = await suggestLocation(finalTitle, selectedMonth);
-
-      const defaultMaxParticipants = 4;
 
       const newEvent: EventData = {
         id: Math.random().toString(36).substr(2, 9),
@@ -36,18 +58,21 @@ const App: React.FC = () => {
         type: selectedType,
         month: selectedMonth,
         attendees: [],
-        maxParticipants: defaultMaxParticipants,
+        maxParticipants: idea.maxParticipants || 4,
         location: location
       };
 
       setEvents(prev => [...prev, newEvent]);
       setInputName('');
       
-      const monthElement = document.getElementById(`month-${selectedMonth}`);
-      monthElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        const monthElement = document.getElementById(`month-${selectedMonth}`);
+        monthElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
 
     } catch (err) {
-      console.error("Failed to add event", err);
+      console.error("Failed to add event:", err);
+      alert("Erreur lors de la création. Vérifiez votre connexion ou réessayez.");
     } finally {
       setLoading(false);
     }
@@ -97,7 +122,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen px-4 py-12 md:py-20 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
-      <header className="w-full text-center mb-24 relative transition-opacity duration-500">
+      <header className="w-full text-center mb-24 relative">
         <div className="absolute -top-20 left-1/4 w-72 h-72 bg-emerald-300/20 rounded-full blur-[100px] -z-10 animate-pulse"></div>
         <div className="absolute -top-10 right-1/4 w-72 h-72 bg-indigo-300/20 rounded-full blur-[100px] -z-10 animate-pulse" style={{ animationDelay: '1s' }}></div>
         
@@ -114,7 +139,6 @@ const App: React.FC = () => {
           <div className="relative glass p-6 md:p-10 rounded-[2.8rem] shadow-2xl shadow-indigo-200/50 w-full flex flex-col lg:flex-row gap-8 items-end bg-white/90 border border-white/80">
             <div className="flex-[2] w-full space-y-3 text-left">
               <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
-                <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 Nom de l'événement
               </label>
               <input 
@@ -127,10 +151,7 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex-1 w-full space-y-3 text-left">
-              <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
-                <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                Mois
-              </label>
+              <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] ml-2">Mois</label>
               <div className="relative">
                 <select 
                   value={selectedMonth}
@@ -140,17 +161,11 @@ const App: React.FC = () => {
                   <option value="">Choisir...</option>
                   {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-300">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-                </div>
               </div>
             </div>
 
             <div className="flex-1 w-full space-y-3 text-left">
-              <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
-                <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                Type
-              </label>
+              <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] ml-2">Type</label>
               <div className="relative">
                 <select 
                   value={selectedType}
@@ -160,9 +175,6 @@ const App: React.FC = () => {
                   <option value="">Choisir...</option>
                   {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-300">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-                </div>
               </div>
             </div>
 
@@ -179,13 +191,7 @@ const App: React.FC = () => {
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
-                <>
-                  <span className="relative z-10 flex items-center gap-2">
-                    <svg className="w-5 h-5 group-hover/btn:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-                    CRÉER
-                  </span>
-                  <div className="absolute inset-0 bg-white/10 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300"></div>
-                </>
+                <span className="relative z-10">CRÉER</span>
               )}
             </button>
           </div>
@@ -230,12 +236,7 @@ const App: React.FC = () => {
                   ))
                 ) : (
                   <div className="h-full w-full flex flex-col items-center justify-center space-y-3 py-10">
-                    <div className={`w-14 h-14 rounded-[2rem] bg-white/50 flex items-center justify-center border-2 border-dashed ${theme.border} group-hover:scale-110 transition-transform`}>
-                      <span className="text-xl grayscale group-hover:grayscale-0 transition-all duration-500 opacity-20 group-hover:opacity-60">✨</span>
-                    </div>
-                    <p className={`text-[9px] font-black uppercase tracking-[0.3em] text-center max-w-[120px] leading-relaxed opacity-30 ${theme.text}`}>
-                      Libre
-                    </p>
+                    <p className={`text-[9px] font-black uppercase tracking-[0.3em] text-center max-w-[120px] opacity-30 ${theme.text}`}>Libre</p>
                   </div>
                 )}
               </div>
@@ -260,10 +261,6 @@ const App: React.FC = () => {
           }}
         />
       )}
-
-      <footer className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] pb-12 text-center w-full opacity-50">
-        &copy; {new Date().getFullYear()} Day <span className="inline-block">🧵</span> — L'élégance de l'organisation
-      </footer>
     </div>
   );
 };

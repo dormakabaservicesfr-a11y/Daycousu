@@ -59,22 +59,14 @@
 <body>
   <div id="root"></div>
   
-  <!-- Chargement du module principal -->
   <script type="module" src="index.tsx"></script>
   
   <script>
-    // Logic d'enregistrement optimisée pour éviter les erreurs d'origine mismatch
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        // Enregistrement avec chemin relatif direct pour éviter la confusion d'origine
         navigator.serviceWorker.register('sw.js')
-          .then(reg => {
-            console.log('SW Registered at scope:', reg.scope);
-          })
-          .catch(err => {
-            // On log en warning pour ne pas polluer la console si le navigateur bloque (ex: iframe)
-            console.warn('Service Worker registration failed (skipped):', err.message);
-          });
+          .then(reg => console.log('SW Registered'))
+          .catch(err => console.warn('SW Skip:', err.message));
       });
     }
   </script>

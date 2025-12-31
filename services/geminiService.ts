@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { EventType, GeminiEventResponse, EventLocation } from "../types";
+import { EventType, GeminiEventResponse, EventLocation } from "../types.ts";
 
 export const generateEventIdeas = async (
   month: string, 
@@ -8,7 +8,6 @@ export const generateEventIdeas = async (
   userProvidedName?: string,
   usedIcons: string[] = []
 ): Promise<GeminiEventResponse> => {
-  // On initialise l'instance juste avant l'appel
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const basePrompt = userProvidedName 
@@ -16,16 +15,13 @@ export const generateEventIdeas = async (
     : `Génère une idée d'événement créative pour le mois de ${month} de type "${type}".`;
 
   const exclusionPrompt = usedIcons.length > 0 
-    ? `IMPORTANT : Ne choisis PAS un émoji parmi la liste suivante car ils sont déjà utilisés : ${usedIcons.join(', ')}.`
+    ? `IMPORTANT : Ne choisis PAS un émoji parmi la liste suivante : ${usedIcons.join(', ')}.`
     : '';
 
   const prompt = `${basePrompt} 
-    Propose une date précise (ex: 12 ${month}), une description attrayante de 2 phrases maximum, un émoji unique qui illustre parfaitement cet événement spécifique, et un nombre maximum de participants recommandé. 
-    IMPORTANT: Utilise systématiquement 4 comme nombre de participants par défaut.
+    Propose une date précise, une description attrayante (2 phrases max), un émoji unique, et un nombre de participants (4 par défaut). 
     ${exclusionPrompt}
-    L'émoji doit être différent de ceux déjà utilisés.
-    Si un nom est déjà fourni, garde-le ou améliore-le très légèrement pour le rendre plus festif.
-    Réponds uniquement au format JSON.`;
+    Réponds uniquement au format JSON pur sans balises Markdown.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -36,60 +32,30 @@ export const generateEventIdeas = async (
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            title: {
-              type: Type.STRING,
-              description: "Le nom de l'événement",
-            },
-            date: {
-              type: Type.STRING,
-              description: "La date exacte (ex: 15 Mars)",
-            },
-            description: {
-              type: Type.STRING,
-              description: "Une courte description accrocheuse",
-            },
-            icon: {
-              type: Type.STRING,
-              description: "Un seul émoji qui représente l'activité",
-            },
-            maxParticipants: {
-              type: Type.INTEGER,
-              description: "Nombre maximum de participants (doit être 4 par défaut)",
-            }
+            title: { type: Type.STRING },
+            date: { type: Type.STRING },
+            description: { type: Type.STRING },
+            icon: { type: Type.STRING },
+            maxParticipants: { type: Type.INTEGER }
           },
           required: ["title", "date", "description", "icon", "maxParticipants"],
         },
       },
     });
 
-    const result = JSON.parse(response.text.trim());
+    // Nettoyage de la réponse pour extraire le JSON valide
+    const text = response.text || "{}";
+    const cleanedJson = text.replace(/```json|```/g, "").trim();
+    const result = JSON.parse(cleanedJson);
     
-    if (usedIcons.includes(result.icon)) {
-      const backupIcons = ['✨', '🌟', '🔥', '🎈', '🎉', '🎊', '🎀', '🎁', '🎨', '🎭', '🎪', '🎡', '🎢', '🎠'];
-      result.icon = backupIcons.find(i => !usedIcons.includes(i)) || '📅';
-    }
-
     return result;
   } catch (error) {
     console.error("Gemini API error:", error);
-    
-    const pool: Record<EventType, string[]> = {
-      [EventType.JOURNEE]: ['☀️', '🏙️', '🍎', '🥪', '🚶', '🏸', '📷'],
-      [EventType.SOIREE]: ['🌙', '🍷', '🍸', '🍻', '🥂', '💃', '🕺', '🎸', '🎵'],
-      [EventType.WEEKEND]: ['📅', '🚗', '⛺', '🚵', '🛶', '🎒', '🥪'],
-      [EventType.VACANCES]: ['🏖️', '✈️', '🚢', '🌴', '🕶️', '🍦', '🌍'],
-      [EventType.ACTIVITE]: ['🏃', '🎾', '🏀', '⚽', '🎨', '♟️', '🎮', '🧩'],
-      [EventType.ANNIVERSAIRE]: ['🎂', '🍰', '🧁', '🎁', '🎈', '🎉', '🥳']
-    };
-
-    const typePool = pool[type] || ['✨'];
-    const availableIcon = typePool.find(icon => !usedIcons.includes(icon)) || '✨';
-
     return {
       title: userProvidedName || `${type} de ${month}`,
-      date: `Samedi 15 ${month}`,
+      date: `15 ${month}`,
       description: "Un moment convivial à ne pas manquer !",
-      icon: availableIcon,
+      icon: "✨",
       maxParticipants: 4
     };
   }
@@ -101,7 +67,7 @@ export const suggestLocation = async (eventTitle: string, month: string): Promis
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Propose un lieu réel et emblématique (adresse ou nom d'établissement) pour un événement intitulé "${eventTitle}" en ${month}. Sois précis sur le lieu.`,
+      contents: `Propose un lieu emblématique pour "${eventTitle}" en ${month}.`,
       config: {
         tools: [{ googleMaps: {} }],
       },
@@ -120,6 +86,6 @@ export const suggestLocation = async (eventTitle: string, month: string): Promis
     return { name: "Lieu à définir" };
   } catch (error) {
     console.error("Location suggestion error:", error);
-    return undefined;
+    return { name: "Lieu à définir" };
   }
 };
