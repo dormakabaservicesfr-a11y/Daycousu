@@ -107,35 +107,83 @@ const App: React.FC = () => {
         <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Base Partagée</span>
       </div>
 
-      <header className="w-full text-center mb-24">
+      <header className="w-full text-center mb-16">
         <h1 className="text-7xl font-black mb-4 tracking-tighter flex items-center justify-center gap-3">
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500">Day</span>
           <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-500 to-teal-600 drop-shadow-sm brightness-110">🧵</span>
         </h1>
-        <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">Organisation Temps Réel + IA</p>
+        <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">La création de vos plus beaux moments</p>
 
-        <div className="glass p-6 md:p-10 rounded-[2.8rem] shadow-2xl max-w-5xl mx-auto flex flex-col lg:flex-row gap-8 items-end bg-white/95 border border-white/80">
-          <div className="flex-[2] w-full space-y-3 text-left">
-            <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] ml-2">Nom (Optionnel)</label>
-            <input type="text" value={inputName} onChange={(e) => setInputName(e.target.value)} placeholder="Ex: Soirée pizza..." className="w-full bg-slate-50/50 border border-slate-200/60 rounded-2xl px-6 py-4.5 focus:ring-4 focus:ring-emerald-100 outline-none font-bold" />
+        {/* Barre de création avec labels verts et bouton Créer */}
+        <div className="max-w-5xl mx-auto">
+          <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
+            
+            {/* Nom */}
+            <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70 group-focus-within:opacity-100">Nom de l'événement</label>
+              <input 
+                type="text" 
+                value={inputName} 
+                onChange={(e) => setInputName(e.target.value)} 
+                placeholder="Ex: Soirée Jeux..." 
+                className="bg-transparent w-full outline-none font-bold text-slate-700 placeholder:text-slate-300 placeholder:font-medium text-sm" 
+              />
+            </div>
+
+            <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
+
+            {/* Mois */}
+            <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70 group-focus-within:opacity-100">Période</label>
+              <select 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(e.target.value)} 
+                className="bg-transparent w-full outline-none font-bold text-slate-600 cursor-pointer text-sm appearance-none"
+              >
+                <option value="" disabled>Choisir un mois</option>
+                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+
+            <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
+
+            {/* Type */}
+            <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70 group-focus-within:opacity-100">Inspiration</label>
+              <select 
+                value={selectedType} 
+                onChange={(e) => setSelectedType(e.target.value as EventType)} 
+                className="bg-transparent w-full outline-none font-bold text-slate-600 cursor-pointer text-sm appearance-none"
+              >
+                <option value="" disabled>Type</option>
+                {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            {/* Bouton CRÉER */}
+            <button 
+              onClick={handleAddEvent} 
+              disabled={loading || !selectedMonth || !selectedType} 
+              className={`
+                m-1 px-10 py-4 rounded-[2rem] font-black text-white shadow-lg transition-all 
+                flex items-center justify-center gap-2 active:scale-95
+                ${loading || !selectedMonth || !selectedType 
+                  ? 'bg-slate-200 shadow-none cursor-not-allowed text-slate-400' 
+                  : 'bg-gradient-to-br from-emerald-500 to-teal-600 hover:shadow-emerald-200/50 hover:-translate-y-0.5'}
+              `}
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <span className="tracking-[0.2em] text-[11px]">CRÉER</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                  </svg>
+                </>
+              )}
+            </button>
           </div>
-          <div className="flex-1 w-full space-y-3 text-left">
-            <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] ml-2">Mois</label>
-            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-full bg-slate-50/50 border border-slate-200/60 rounded-2xl px-6 py-4.5 outline-none font-bold appearance-none cursor-pointer">
-              <option value="">Choisir...</option>
-              {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-          <div className="flex-1 w-full space-y-3 text-left">
-            <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] ml-2">Type</label>
-            <select value={selectedType} onChange={(e) => setSelectedType(e.target.value as EventType)} className="w-full bg-slate-50/50 border border-slate-200/60 rounded-2xl px-6 py-4.5 outline-none font-bold appearance-none cursor-pointer">
-              <option value="">Choisir...</option>
-              {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <button onClick={handleAddEvent} disabled={loading || !selectedMonth || !selectedType} className={`w-full lg:w-auto px-12 py-4.5 rounded-2xl font-black text-white shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95 ${loading || !selectedMonth || !selectedType ? 'bg-slate-200' : 'bg-gradient-to-br from-emerald-500 to-teal-600'}`}>
-            {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <span>CRÉER</span>}
-          </button>
         </div>
       </header>
 

@@ -15,7 +15,8 @@
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
   
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Retour à la police élégante : Plus Jakarta Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Gun.js pour la base de données partagée temps réel -->
   <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
@@ -26,6 +27,7 @@
       background: radial-gradient(circle at top left, #f8fafc, #f1f5f9);
       min-height: 100vh;
       -webkit-tap-highlight-color: transparent;
+      color: #334155;
     }
     .glass {
       background: rgba(255, 255, 255, 0.7);
@@ -51,6 +53,11 @@
       0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
       70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
       100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    
+    /* Smooth transitions pour les changements d'état */
+    * {
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     }
   </style>
 

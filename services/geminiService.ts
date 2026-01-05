@@ -28,7 +28,8 @@ export const generateEventIdeas = async (
     : `Génère une idée d'événement créative et originale pour le mois de ${month} de type "${type}".`;
 
   const prompt = `${basePrompt} 
-    Propose : Un titre, une date précise en ${month}, une description courte (150 car. max), un émoji et un nombre de participants.
+    Propose : Un titre, une date précise en ${month}, une description courte (150 car. max) et un émoji.
+    IMPORTANT : Le nombre de participants (maxParticipants) doit TOUJOURS être fixé à 4.
     Réponds UNIQUEMENT en JSON.`;
 
   try {
@@ -52,7 +53,12 @@ export const generateEventIdeas = async (
     });
 
     const data = JSON.parse(response.text || "{}");
-    return { ...data, isAiGenerated: true };
+    // On force la valeur à 4 pour corriger toute erreur de l'IA
+    return { 
+      ...data, 
+      maxParticipants: 4, 
+      isAiGenerated: true 
+    };
   } catch (error: any) {
     console.error("Détail erreur Gemini:", error);
     let msg = "Erreur technique IA.";
