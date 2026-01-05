@@ -29,21 +29,22 @@ const App: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
   const [errorInfo, setErrorInfo] = useState<{message: string, isKeyError: boolean} | null>(null);
 
-  // Détection robuste du studio AI (recherche récursive simple)
-  const getAIStudio = useCallback(() => {
+  // Recherche ultra-robuste de l'objet aistudio dans la hiérarchie des frames
+  const getAIStudio = useCallback((): AIStudio | null => {
     try {
       if (window.aistudio) return window.aistudio;
-      if (window.parent && (window.parent as any).aistudio) return (window.parent as any).aistudio;
-      if (window.top && (window.top as any).aistudio) return (window.top as any).aistudio;
-      return null;
+      if (typeof window.parent !== 'undefined' && (window.parent as any).aistudio) return (window.parent as any).aistudio;
+      if (typeof window.top !== 'undefined' && (window.top as any).aistudio) return (window.top as any).aistudio;
     } catch (e) {
-      return null;
+      console.warn("Accès aux frames parentes restreint par la politique CORS.");
     }
+    return null;
   }, []);
 
   useEffect(() => {
+    // Initialisation de Gun.js avec un canal unique pour éviter les collisions
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
-    const node = gun.get('day_app_shared_v10_final'); 
+    const node = gun.get('day_app_shared_v11_stable'); 
     setGunNode(node);
 
     const checkKey = async () => {
@@ -53,8 +54,11 @@ const App: React.FC = () => {
           const has = await studio.hasSelectedApiKey();
           setHasApiKey(has);
         } catch (e) {
-          console.warn("Vérification clé API impossible");
+          // Si on a déjà une clé en env, on considère que c'est bon
+          setHasApiKey(!!process.env.API_KEY);
         }
+      } else {
+        setHasApiKey(!!process.env.API_KEY);
       }
     };
     checkKey();
@@ -84,15 +88,14 @@ const App: React.FC = () => {
     if (studio) {
       try {
         await studio.openSelectKey();
-        // Règle Gemini : Assumer le succès immédiatement après l'appel
         setHasApiKey(true);
         setErrorInfo(null);
       } catch (e) {
-        setErrorInfo({ message: "Échec de l'ouverture du sélecteur de clé.", isKeyError: true });
+        setErrorInfo({ message: "Le sélecteur n'a pas pu s'ouvrir. Essayez de recharger la page.", isKeyError: true });
       }
     } else {
       setErrorInfo({ 
-        message: "Sélecteur de clé introuvable. Veuillez rafraîchir la page ou vérifier vos paramètres de sécurité.", 
+        message: "L'outil de sélection de clé n'est pas accessible dans ce navigateur. Vérifiez que vous n'êtes pas en navigation privée.", 
         isKeyError: true 
       });
     }
@@ -120,11 +123,11 @@ const App: React.FC = () => {
       setSelectedType('');
     } catch (err: any) {
       const msg = err.message || "";
-      if (msg.includes("KEY_NOT_FOUND") || msg.includes("invalid") || msg.includes("entity was not found")) {
+      if (msg.includes("KEY_NOT_FOUND") || msg.includes("401") || msg.includes("not found")) {
         setHasApiKey(false);
-        setErrorInfo({ message: "Une clé API valide est nécessaire. Veuillez cliquer sur 'Saisir une clé'.", isKeyError: true });
+        setErrorInfo({ message: "Une clé API est requise pour l'IA. Veuillez en sélectionner une.", isKeyError: true });
       } else {
-        setErrorInfo({ message: "Erreur IA : " + msg, isKeyError: false });
+        setErrorInfo({ message: "Note : " + msg, isKeyError: false });
       }
     } finally {
       setLoading(false);
@@ -149,33 +152,34 @@ const App: React.FC = () => {
       </div>
 
       <header className="w-full text-center mb-16 flex flex-col items-center">
-        {/* Logo unifié : Fil et Aiguille partant du Y */}
-        <div className="relative mb-6">
+        {/* Logo Stylisé : Fil part du pied du Y avec une aiguille au bout */}
+        <div className="relative mb-8">
           <h1 className="text-8xl font-black tracking-tighter flex items-center justify-center relative">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500 relative">
               Day
-              {/* Le fil et l'aiguille intégrés */}
-              <svg className="absolute top-[82%] left-[82%] w-[160px] h-[70px] pointer-events-none overflow-visible" viewBox="0 0 160 70" fill="none">
+              <svg className="absolute top-[88%] left-[84%] w-[200px] h-[80px] pointer-events-none overflow-visible" viewBox="0 0 200 80" fill="none">
+                 {/* Le Fil */}
                  <path 
                    className="thread-path"
-                   d="M0,0 C20,40 70,50 110,15" 
-                   stroke="url(#threadGradLogo)" 
-                   strokeWidth="3" 
+                   d="M0,0 C20,50 100,60 150,20" 
+                   stroke="url(#gradLogo)" 
+                   strokeWidth="3.5" 
                    strokeLinecap="round" 
                    fill="none" 
                  />
-                 {/* L'aiguille au bout du fil */}
-                 <g transform="translate(110, 15) rotate(-30)">
+                 {/* L'Aiguille à l'extrémité du fil */}
+                 <g transform="translate(150, 20) rotate(-25)">
+                    {/* Corps de l'aiguille */}
                     <path 
-                      d="M-2,0 L35,0 L42,2 L35,4 L-2,4 C-4,4 -7,2 -7,2 C-7,2 -4,0 -2,0 Z" 
-                      fill="url(#threadGradLogo)"
+                      d="M-5,0 L45,0 L55,2.5 L45,5 L-5,5 C-8,5 -12,2.5 -12,2.5 C-12,2.5 -8,0 -5,0 Z" 
+                      fill="url(#gradLogo)"
                       className="animate-float"
                     />
-                    {/* Le chas de l'aiguille */}
-                    <circle cx="-2.5" cy="2" r="1.2" fill="white" fillOpacity="0.8" />
+                    {/* Chas de l'aiguille (le trou) */}
+                    <circle cx="-6" cy="2.5" r="1.5" fill="white" fillOpacity="0.9" />
                  </g>
                  <defs>
-                   <linearGradient id="threadGradLogo" x1="0" y1="0" x2="1" y2="0.5">
+                   <linearGradient id="gradLogo" x1="0" y1="0" x2="1" y2="0.5">
                      <stop stopColor="#10b981" />
                      <stop offset="1" stopColor="#14b8a6" />
                    </linearGradient>
@@ -185,22 +189,32 @@ const App: React.FC = () => {
           </h1>
         </div>
         
-        <p className="text-slate-400 mt-6 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">L'organisation cousue main</p>
+        <p className="text-slate-400 mt-8 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">L'organisation cousue main</p>
 
         {errorInfo && (
           <div className={`max-w-2xl w-full mb-10 p-6 rounded-[2.5rem] border text-left shadow-2xl animate-in fade-in slide-in-from-top-4 ${errorInfo.isKeyError ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'}`}>
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-xl">{errorInfo.isKeyError ? '🔑' : '⚠️'}</span>
-              <p className="text-xs font-black uppercase tracking-widest text-slate-400">Configuration Requise</p>
+              <span className="text-xl">{errorInfo.isKeyError ? '🔑' : '💡'}</span>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Note système</p>
             </div>
             <p className="text-sm font-bold text-slate-700 ml-8">{errorInfo.message}</p>
             {errorInfo.isKeyError && (
-              <button 
-                onClick={handleOpenKeySelector} 
-                className="mt-4 ml-8 px-8 py-2.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black transition-all hover:scale-105 active:scale-95 shadow-lg border border-white/20"
-              >
-                Saisir une clé maintenant
-              </button>
+              <div className="mt-4 ml-8 flex flex-wrap gap-3">
+                <button 
+                  onClick={handleOpenKeySelector} 
+                  className="px-8 py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black transition-all hover:scale-105 active:scale-95 shadow-lg"
+                >
+                  Saisir une clé
+                </button>
+                <a 
+                  href="https://ai.google.dev/gemini-api/docs/billing" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="px-6 py-3 bg-white border border-slate-200 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-slate-50 transition-all"
+                >
+                  Aide facturation
+                </a>
+              </div>
             )}
           </div>
         )}
@@ -213,7 +227,7 @@ const App: React.FC = () => {
                 type="text" 
                 value={inputName} 
                 onChange={(e) => setInputName(e.target.value)} 
-                placeholder="Titre libre (ex: Soirée Jeux)" 
+                placeholder="Titre libre (ex: Brunch)" 
                 className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm placeholder:text-slate-300" 
               />
             </div>
