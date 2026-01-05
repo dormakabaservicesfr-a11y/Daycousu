@@ -2,17 +2,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { EventType, GeminiEventResponse, EventLocation } from "../types.ts";
 
+/**
+ * Crée une instance fraîche de l'IA avec la clé actuelle de l'environnement.
+ * Les règles imposent de créer l'instance juste avant l'appel.
+ */
+const getAiInstance = () => {
+  const apiKey = process.env.API_KEY;
+  return new GoogleGenAI({ apiKey: apiKey || '' });
+};
+
 export const generateEventIdeas = async (
   month: string, 
   type: EventType, 
-  userProvidedName?: string,
-  usedIcons: string[] = []
+  userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  // On récupère la clé au moment de l'appel pour s'assurer d'avoir la plus récente
-  const apiKey = process.env.API_KEY;
-  
-  // Initialisation de l'IA (le SDK gérera l'absence de clé si elle n'est pas injectée par la plateforme)
-  const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+  const ai = getAiInstance();
   
   const basePrompt = userProvidedName 
     ? `L'utilisateur veut organiser un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
@@ -21,7 +25,7 @@ export const generateEventIdeas = async (
   const prompt = `${basePrompt} 
     Propose : Un titre, une date précise en ${month}, une description courte (150 car. max) et un émoji.
     IMPORTANT : Le nombre de participants (maxParticipants) doit TOUJOURS être fixé à 4.
-    Réponds UNIQUEMENT en JSON.`;
+    Réponds uniquement en JSON valide.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -43,28 +47,38 @@ export const generateEventIdeas = async (
       },
     });
 
-    const data = JSON.parse(response.text || "{}");
+    const text = response.text;
+    if (!text) throw new Error("EMPTY_RESPONSE");
+
+    const data = JSON.parse(text);
     return { 
       ...data, 
       maxParticipants: 4, 
       isAiGenerated: true 
     };
   } catch (error: any) {
-    console.error("Détail erreur Gemini:", error);
+    const errorMsg = error?.message || "";
+    console.error("Gemini Error Details:", error);
     
-    // Si l'erreur indique que la clé est manquante ou invalide dans cet environnement
-    if (error?.message?.includes("Requested entity was not found") || error?.message?.includes("API key not found")) {
+    // Cas où la clé est manquante ou invalide dans l'environnement Vercel / AI Studio
+    if (
+      errorMsg.includes("Requested entity was not found") || 
+      errorMsg.includes("API key not found") ||
+      errorMsg.includes("401") ||
+      errorMsg.includes("403")
+    ) {
         throw new Error("KEY_NOT_FOUND");
     }
 
-    let msg = "Erreur technique IA.";
-    if (error?.message?.includes("401")) msg = "Clé API invalide ou expirée.";
-    if (error?.message?.includes("429")) msg = "Quota dépassé (trop de requêtes).";
+    // Autres erreurs (Quota, Modèle, etc.)
+    let userMsg = "Erreur technique IA.";
+    if (errorMsg.includes("429")) userMsg = "Quota dépassé (Passez au plan payant).";
+    if (errorMsg.includes("billing")) userMsg = "Facturation requise sur Google Cloud.";
     
     return {
       title: userProvidedName || `${type} de ${month}`,
       date: `Courant ${month}`,
-      description: `Fallback: ${msg}`,
+      description: `Note: ${userMsg}`,
       icon: "⚠️",
       maxParticipants: 4,
       isAiGenerated: false
@@ -73,17 +87,28 @@ export const generateEventIdeas = async (
 };
 
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
-  const apiKey = process.env.API_KEY;
   try {
-    const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+    const ai = getAiInstance();
+    // Maps grounding nécessite gemini-2.5-flash
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Où organiser "${eventTitle}" en ${month} ?`,
-      config: { tools: [{ googleMaps: {} }] },
+      contents: `Où organiser "${eventTitle}" en ${month} ? Sois précis.`,
+      config: { 
+        tools: [{ googleMaps: {} }] 
+      },
     });
+
     const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     const mapsChunk = chunks?.find(chunk => chunk.maps);
-    if (mapsChunk) return { name: mapsChunk.maps.title, mapsUri: mapsChunk.maps.uri };
-  } catch (e) { /* ignore silent */ }
+    
+    if (mapsChunk && mapsChunk.maps) {
+      return { 
+        name: mapsChunk.maps.title, 
+        mapsUri: mapsChunk.maps.uri 
+      };
+    }
+  } catch (e) {
+    console.error("Grounding error:", e);
+  }
   return { name: "Lieu à définir" };
 };

@@ -8,14 +8,11 @@ import RegistrationModal from './components/RegistrationModal.tsx';
 
 declare var Gun: any;
 
-// Types pour l'API de sélection de clé
-// Correction de l'erreur TypeScript en utilisant le nom d'interface AIStudio attendu par l'environnement
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
   }
-
   interface Window {
     aistudio?: AIStudio;
   }
@@ -30,13 +27,11 @@ const App: React.FC = () => {
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Vérifier si une clé est déjà sélectionnée au démarrage
     if (window.aistudio) {
-      window.aistudio.hasSelectedApiKey().then(has => {
-        setHasApiKey(has);
-      });
+      window.aistudio.hasSelectedApiKey().then(has => setHasApiKey(has));
     }
 
     const gun = Gun([
@@ -69,14 +64,16 @@ const App: React.FC = () => {
   const handleOpenKeySelector = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      // On assume que l'utilisateur a fait son choix pour éviter les conditions de course
       setHasApiKey(true);
+      setErrorMessage(null);
     }
   };
 
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
     setLoading(true);
+    setErrorMessage(null);
+    
     try {
       const idea = await generateEventIdeas(selectedMonth, selectedType, inputName);
       const location = await suggestLocation(idea.title, selectedMonth);
@@ -99,9 +96,12 @@ const App: React.FC = () => {
       setInputName('');
       setSelectedType('');
     } catch (err: any) {
-      console.error(err);
+      console.error("App catch:", err);
       if (err.message === "KEY_NOT_FOUND") {
         setHasApiKey(false);
+        setErrorMessage("Clé API manquante ou invalide. Veuillez en sélectionner une nouvelle.");
+      } else {
+        setErrorMessage("L'IA a rencontré une difficulté. Vérifiez votre quota ou votre connexion.");
       }
     } finally {
       setLoading(false);
@@ -146,9 +146,6 @@ const App: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-full shadow-lg hover:bg-amber-600 transition-all animate-bounce"
           >
             <span className="text-[10px] font-black uppercase tracking-widest">Activer l'IA</span>
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-            </svg>
           </button>
         )}
       </div>
@@ -160,43 +157,46 @@ const App: React.FC = () => {
         </h1>
         <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">La création de vos plus beaux moments</p>
 
+        {errorMessage && (
+          <div className="max-w-xl mx-auto mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-[10px] font-bold uppercase tracking-widest animate-in fade-in slide-in-from-top-2">
+            ⚠️ {errorMessage}
+          </div>
+        )}
+
         {window.aistudio && !hasApiKey && (
           <div className="max-w-xl mx-auto mb-10 p-6 bg-amber-50 border border-amber-200 rounded-[2.5rem] text-left shadow-inner">
             <h3 className="text-amber-800 font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
-              <span className="text-lg">💡</span> Configuration de l'IA nécessaire
+              <span className="text-lg">💡</span> Action requise : Sélection de Clé
             </h3>
             <p className="text-amber-700 text-xs leading-relaxed mb-4">
-              Pour que l'IA puisse générer des idées sur Vercel, vous devez sélectionner une clé API valide. 
-              Utilisez une clé provenant d'un projet GCP avec <strong>facturation activée</strong>.
-              Plus d'infos sur la <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline font-bold">facturation Gemini</a>.
+              Pour utiliser Gemini 3 sur Vercel, vous devez fournir votre propre clé API issue d'un projet avec <strong>facturation activée</strong>.
+              <br/><br/>
+              Consultez la <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline font-bold">doc facturation</a>.
             </p>
             <button 
               onClick={handleOpenKeySelector}
               className="w-full py-3 bg-amber-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-amber-700 transition-colors shadow-lg"
             >
-              Sélectionner ma Clé API
+              Sélectionner ma Clé API Pay-as-you-go
             </button>
           </div>
         )}
 
         <div className="max-w-5xl mx-auto">
           <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
-            
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70 group-focus-within:opacity-100">Nom de l'événement</label>
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Nom de l'événement</label>
               <input 
                 type="text" 
                 value={inputName} 
                 onChange={(e) => setInputName(e.target.value)} 
                 placeholder="Ex: Soirée Jeux..." 
-                className="bg-transparent w-full outline-none font-bold text-slate-700 placeholder:text-slate-300 placeholder:font-medium text-sm" 
+                className="bg-transparent w-full outline-none font-bold text-slate-700 placeholder:text-slate-300 text-sm" 
               />
             </div>
-
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
-
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70 group-focus-within:opacity-100">Période</label>
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Période</label>
               <select 
                 value={selectedMonth} 
                 onChange={(e) => setSelectedMonth(e.target.value)} 
@@ -206,11 +206,9 @@ const App: React.FC = () => {
                 {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
-
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
-
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70 group-focus-within:opacity-100">Inspiration</label>
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Inspiration</label>
               <select 
                 value={selectedType} 
                 onChange={(e) => setSelectedType(e.target.value as EventType)} 
@@ -220,7 +218,6 @@ const App: React.FC = () => {
                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-
             <button 
               onClick={handleAddEvent} 
               disabled={loading || !selectedMonth || !selectedType} 
@@ -235,12 +232,7 @@ const App: React.FC = () => {
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
-                <>
-                  <span className="tracking-[0.2em] text-[11px]">CRÉER</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                  </svg>
-                </>
+                <span className="tracking-[0.2em] text-[11px]">CRÉER</span>
               )}
             </button>
           </div>
