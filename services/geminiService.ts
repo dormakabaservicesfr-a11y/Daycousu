@@ -10,7 +10,7 @@ export const generateEventIdeas = async (
   const apiKey = process.env.API_KEY;
   if (!apiKey) throw new Error("KEY_NOT_FOUND");
 
-  // Création d'une nouvelle instance à chaque appel comme recommandé
+  // Initialisation propre pour Vercel
   const ai = new GoogleGenAI({ apiKey });
   
   const basePrompt = userProvidedName 
@@ -27,8 +27,6 @@ export const generateEventIdeas = async (
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
-        // Activation du mode réflexion pour une meilleure créativité
-        thinkingConfig: { thinkingBudget: 2000 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -44,19 +42,17 @@ export const generateEventIdeas = async (
       },
     });
 
+    // Utilisation de .text pour extraire le JSON
     const data = JSON.parse(response.text || "{}");
     return { 
       ...data, 
-      maxParticipants: 4, 
+      maxParticipants: data.maxParticipants || 4, 
       isAiGenerated: true 
     };
   } catch (error: any) {
-    const errorMsg = error?.message || "";
-    if (errorMsg.includes("API key") || errorMsg.includes("invalid") || errorMsg.includes("401")) {
+    console.error("Erreur Gemini:", error);
+    if (error.message?.includes("API key") || error.status === 401) {
       throw new Error("KEY_NOT_FOUND");
-    }
-    if (errorMsg.includes("quota") || errorMsg.includes("429")) {
-      throw new Error("QUOTA_EXCEEDED");
     }
     throw error;
   }
@@ -69,17 +65,16 @@ export const suggestLocation = async (eventTitle: string, month: string): Promis
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-lite-latest",
-      contents: `Suggère un lieu réel et approprié pour "${eventTitle}" en ${month}.`,
-      config: { tools: [{ googleMaps: {} }] },
+      model: "gemini-3-flash-preview",
+      contents: `Suggère un lieu réel et approprié pour l'événement "${eventTitle}" qui a lieu en ${month}. Réponds juste le nom du lieu et la ville.`,
     });
 
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    const mapsChunk = chunks?.find(chunk => chunk.maps);
+    const locationName = response.text?.trim() || "Lieu à définir";
     
-    return mapsChunk?.maps 
-      ? { name: mapsChunk.maps.title, mapsUri: mapsChunk.maps.uri }
-      : { name: "Lieu à définir" };
+    return { 
+      name: locationName, 
+      mapsUri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}` 
+    };
   } catch (e) {
     return { name: "Lieu à définir" };
   }

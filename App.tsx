@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants.tsx';
 import { EventType, EventData } from './types.ts';
 import { generateEventIdeas, suggestLocation } from './services/geminiService.ts';
@@ -7,16 +7,6 @@ import EventBubble from './components/EventBubble.tsx';
 import RegistrationModal from './components/RegistrationModal.tsx';
 
 declare var Gun: any;
-
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
 
 const App: React.FC = () => {
   const [events, setEvents] = useState<EventData[]>([]);
@@ -26,38 +16,21 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
   const [errorInfo, setErrorInfo] = useState<{message: string, isKeyError: boolean} | null>(null);
 
-  // Recherche de l'objet aistudio avec fallback sur process.env.API_KEY
-  const getAIStudio = useCallback((): AIStudio | null => {
-    try {
-      if (window.aistudio) return window.aistudio;
-      if (typeof window.parent !== 'undefined' && (window.parent as any).aistudio) return (window.parent as any).aistudio;
-      if (typeof window.top !== 'undefined' && (window.top as any).aistudio) return (window.top as any).aistudio;
-    } catch (e) {}
-    return null;
-  }, []);
-
   useEffect(() => {
+    // Initialisation de la base de données décentralisée
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
-    const node = gun.get('day_app_shared_v12_final_stitch'); 
+    const node = gun.get('day_app_final_stable_v1'); 
     setGunNode(node);
 
-    const checkInitialKey = async () => {
-      const studio = getAIStudio();
-      if (studio) {
-        try {
-          const has = await studio.hasSelectedApiKey();
-          setHasApiKey(has || !!process.env.API_KEY);
-        } catch (e) {
-          setHasApiKey(!!process.env.API_KEY);
-        }
-      } else {
-        setHasApiKey(!!process.env.API_KEY);
-      }
-    };
-    checkInitialKey();
+    // Vérification de la clé API au démarrage
+    if (!process.env.API_KEY) {
+      setErrorInfo({ 
+        message: "Clé API non détectée. Assurez-vous d'avoir configuré 'API_KEY' dans les variables d'environnement Vercel.", 
+        isKeyError: true 
+      });
+    }
 
     node.map().on((data: any, id: string) => {
       setEvents(current => {
@@ -77,31 +50,11 @@ const App: React.FC = () => {
       });
     });
     return () => node.off();
-  }, [getAIStudio]);
-
-  const handleOpenKeySelector = async () => {
-    const studio = getAIStudio();
-    if (studio) {
-      try {
-        await studio.openSelectKey();
-        setHasApiKey(true);
-        setErrorInfo(null);
-      } catch (e) {
-        setErrorInfo({ message: "Le sélecteur n'a pas pu s'ouvrir. Vérifiez vos extensions.", isKeyError: true });
-      }
-    } else if (!process.env.API_KEY) {
-      setErrorInfo({ 
-        message: "L'outil de sélection est indisponible. Essayez de recharger ou d'utiliser un autre navigateur.", 
-        isKeyError: true 
-      });
-    } else {
-      setHasApiKey(true);
-      setErrorInfo(null);
-    }
-  };
+  }, []);
 
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
+    
     setLoading(true);
     setErrorInfo(null);
     
@@ -121,12 +74,11 @@ const App: React.FC = () => {
       setInputName('');
       setSelectedType('');
     } catch (err: any) {
-      const msg = err.message || "";
-      if (msg.includes("KEY_NOT_FOUND") || msg.includes("401")) {
-        setHasApiKey(false);
-        setErrorInfo({ message: "Clé API absente ou invalide. L'IA est désactivée.", isKeyError: true });
+      console.error(err);
+      if (err.message === "KEY_NOT_FOUND") {
+        setErrorInfo({ message: "La clé API Gemini est absente ou invalide dans Vercel.", isKeyError: true });
       } else {
-        setErrorInfo({ message: "Info : " + msg, isKeyError: false });
+        setErrorInfo({ message: "Une erreur est survenue lors de la génération.", isKeyError: false });
       }
     } finally {
       setLoading(false);
@@ -135,48 +87,40 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen px-4 py-12 md:py-20 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
-      <div className="fixed top-6 right-6 z-[60] flex flex-col items-end gap-2">
+      <div className="fixed top-6 right-6 z-[60]">
         <div className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-emerald-100">
           <div className="w-2 h-2 rounded-full bg-emerald-500 sync-indicator"></div>
           <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Live Sync</span>
         </div>
-        {!hasApiKey && !process.env.API_KEY && (
-          <button 
-            onClick={handleOpenKeySelector} 
-            className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-full shadow-xl font-black text-[11px] uppercase animate-pulse border-2 border-white/50"
-          >
-            Activer l'IA ✨
-          </button>
-        )}
       </div>
 
       <header className="w-full text-center mb-16 flex flex-col items-center">
-        {/* Logo Stylisé : Dé à coudre à côté du texte */}
         <div className="relative mb-6">
           <h1 className="text-8xl font-black tracking-tighter flex items-center justify-center relative">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500 relative flex items-center gap-4">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500 relative flex items-center gap-6">
               Day
-              <svg className="w-16 h-16 animate-float" viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20,100 L80,100 C80,100 85,30 50,20 C15,30 20,100 20,100 Z" fill="url(#thimbleGrad)" />
-                {/* Petits points du dé */}
-                <circle cx="35" cy="45" r="3" fill="white" fillOpacity="0.2" />
-                <circle cx="50" cy="40" r="3" fill="white" fillOpacity="0.2" />
-                <circle cx="65" cy="45" r="3" fill="white" fillOpacity="0.2" />
-                <circle cx="30" cy="65" r="3" fill="white" fillOpacity="0.2" />
-                <circle cx="50" cy="60" r="3" fill="white" fillOpacity="0.2" />
-                <circle cx="70" cy="65" r="3" fill="white" fillOpacity="0.2" />
-                <circle cx="35" cy="85" r="3" fill="white" fillOpacity="0.2" />
-                <circle cx="50" cy="80" r="3" fill="white" fillOpacity="0.2" />
-                <circle cx="65" cy="85" r="3" fill="white" fillOpacity="0.2" />
-                {/* Bordure du bas */}
-                <path d="M15,100 Q15,115 50,115 Q85,115 85,100" stroke="url(#thimbleGrad)" strokeWidth="6" strokeLinecap="round" />
-                <defs>
-                  <linearGradient id="thimbleGrad" x1="0" y1="0" x2="1" y2="1">
-                    <stop stopColor="#10b981" />
-                    <stop offset="1" stopColor="#14b8a6" />
-                  </linearGradient>
-                </defs>
-              </svg>
+              <div className="w-20 h-20 animate-float flex items-center justify-center">
+                <svg viewBox="0 0 100 120" className="w-full h-full drop-shadow-2xl" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M25,100 L75,100 C75,100 82,30 50,20 C18,30 25,100 25,100 Z" fill="url(#thimbleGrad)" />
+                  <path d="M25,100 L75,100 C75,100 82,30 50,20 C18,30 25,100 25,100 Z" fill="url(#thimbleOverlay)" />
+                  <g fill="white" fillOpacity="0.15">
+                    {[35, 50, 65].map(x => [40, 55, 70, 85].map(y => (
+                      <circle key={`${x}-${y}`} cx={x} cy={y} r="2.5" />
+                    )))}
+                  </g>
+                  <path d="M18,98 Q18,112 50,112 Q82,112 82,98" stroke="url(#thimbleGrad)" strokeWidth="8" strokeLinecap="round" fill="none" />
+                  <defs>
+                    <linearGradient id="thimbleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#0d9488" />
+                    </linearGradient>
+                    <radialGradient id="thimbleOverlay" cx="50%" cy="40%" r="60%">
+                      <stop offset="0%" stopColor="white" stopOpacity="0.2" />
+                      <stop offset="100%" stopColor="black" stopOpacity="0.1" />
+                    </radialGradient>
+                  </defs>
+                </svg>
+              </div>
             </span>
           </h1>
         </div>
@@ -184,22 +128,8 @@ const App: React.FC = () => {
         <p className="text-slate-400 mt-6 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">L'organisation cousue main</p>
 
         {errorInfo && (
-          <div className={`max-w-2xl w-full mb-10 p-6 rounded-[2.5rem] border text-left shadow-2xl animate-in fade-in slide-in-from-top-4 ${errorInfo.isKeyError ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'}`}>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-xl">{errorInfo.isKeyError ? '🔑' : '💡'}</span>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Note de l'assistant</p>
-            </div>
-            <p className="text-sm font-bold text-slate-700 ml-8">{errorInfo.message}</p>
-            {!hasApiKey && (
-              <div className="mt-4 ml-8 flex flex-wrap gap-3">
-                <button 
-                  onClick={handleOpenKeySelector} 
-                  className="px-8 py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black transition-all hover:scale-105 active:scale-95 shadow-lg"
-                >
-                  Réessayer
-                </button>
-              </div>
-            )}
+          <div className="max-w-xl w-full mb-8 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left shadow-lg">
+            <p className="text-xs font-bold text-amber-800">{errorInfo.message}</p>
           </div>
         )}
 
