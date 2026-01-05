@@ -27,7 +27,7 @@ const App: React.FC = () => {
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
-  const [errorMessage, setErrorMessage] = useState<{title: string, detail: string, isBilling?: boolean} | null>(null);
+  const [errorStatus, setErrorStatus] = useState<'NONE' | 'KEY' | 'BILLING' | 'OTHER'>('NONE');
 
   useEffect(() => {
     if (window.aistudio) {
@@ -62,14 +62,14 @@ const App: React.FC = () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
       setHasApiKey(true);
-      setErrorMessage(null);
+      setErrorStatus('NONE');
     }
   };
 
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
     setLoading(true);
-    setErrorMessage(null);
+    setErrorStatus('NONE');
     
     try {
       const idea = await generateEventIdeas(selectedMonth, selectedType, inputName);
@@ -87,23 +87,13 @@ const App: React.FC = () => {
       setInputName('');
       setSelectedType('');
     } catch (err: any) {
-      if (err.message === "KEY_NOT_FOUND") {
+      if (err.message === "RESET_KEY" || err.message === "KEY_NOT_FOUND") {
         setHasApiKey(false);
-        setErrorMessage({
-          title: "Clé API non reconnue",
-          detail: "Veuillez sélectionner une clé valide via le bouton Activer l'IA."
-        });
+        setErrorStatus('KEY');
       } else if (err.message === "BILLING_REQUIRED") {
-        setErrorMessage({
-          title: "Facturation requise",
-          detail: "Gemini 3 nécessite un compte Google Cloud avec facturation activée pour fonctionner sur ce domaine.",
-          isBilling: true
-        });
+        setErrorStatus('BILLING');
       } else {
-        setErrorMessage({
-          title: "Indisponibilité temporaire",
-          detail: "L'IA ne répond pas. Vérifiez vos quotas dans Google AI Studio."
-        });
+        setErrorStatus('OTHER');
       }
     } finally {
       setLoading(false);
@@ -129,20 +119,29 @@ const App: React.FC = () => {
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500">Day</span>
           <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-500 to-teal-600 drop-shadow-sm">🧵</span>
         </h1>
-        <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">L'IA au service de vos événements</p>
+        <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">Planifiez vos moments d'exception</p>
 
-        {errorMessage && (
-          <div className={`max-w-2xl mx-auto mb-8 p-6 rounded-[2rem] border text-left shadow-xl animate-in fade-in slide-in-from-top-4 ${errorMessage.isBilling ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'}`}>
-            <h3 className={`font-black text-xs uppercase tracking-widest mb-2 ${errorMessage.isBilling ? 'text-amber-800' : 'text-rose-800'}`}>
-              ⚠️ {errorMessage.title}
+        {errorStatus !== 'NONE' && (
+          <div className={`max-w-2xl mx-auto mb-10 p-6 rounded-[2.5rem] border text-left shadow-xl animate-in fade-in slide-in-from-top-4 ${errorStatus === 'BILLING' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'}`}>
+            <h3 className={`font-black text-xs uppercase tracking-widest mb-2 ${errorStatus === 'BILLING' ? 'text-amber-800' : 'text-rose-800'}`}>
+              ⚠️ {errorStatus === 'BILLING' ? 'Facturation Requise' : errorStatus === 'KEY' ? 'Clé API Invalide' : 'Erreur Technique IA'}
             </h3>
-            <p className={`text-xs leading-relaxed mb-4 ${errorMessage.isBilling ? 'text-amber-700' : 'text-rose-700'}`}>
-              {errorMessage.detail}
+            <p className="text-xs leading-relaxed mb-4 text-slate-600">
+              {errorStatus === 'BILLING' 
+                ? "L'utilisation de Gemini 3 sur Vercel nécessite une clé liée à un compte Google Cloud payant (Pay-as-you-go). Le plan gratuit est souvent bloqué."
+                : errorStatus === 'KEY'
+                ? "Votre clé API a expiré ou n'est pas reconnue par le modèle Gemini 3. Veuillez en sélectionner une nouvelle."
+                : "L'IA rencontre une difficulté technique ou a atteint son quota. Réessayez dans quelques minutes."}
             </p>
-            {errorMessage.isBilling && (
+            {errorStatus === 'BILLING' && (
               <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-2 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-amber-700">
-                Voir la documentation Facturation
+                Documentation Facturation
               </a>
+            )}
+            {(errorStatus === 'KEY' || errorStatus === 'BILLING') && (
+              <button onClick={handleOpenKeySelector} className="ml-2 inline-block px-6 py-2 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black">
+                Changer de clé
+              </button>
             )}
           </div>
         )}
@@ -151,13 +150,13 @@ const App: React.FC = () => {
           <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Événement</label>
-              <input type="text" value={inputName} onChange={(e) => setInputName(e.target.value)} placeholder="Soirée, activité..." className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm" />
+              <input type="text" value={inputName} onChange={(e) => setInputName(e.target.value)} placeholder="Soirée, anniversaire..." className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm" />
             </div>
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Mois</label>
               <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer">
-                <option value="" disabled>Choisir</option>
+                <option value="" disabled>Mois</option>
                 {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
@@ -165,7 +164,7 @@ const App: React.FC = () => {
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Type</label>
               <select value={selectedType} onChange={(e) => setSelectedType(e.target.value as EventType)} className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer">
-                <option value="" disabled>Style</option>
+                <option value="" disabled>Type</option>
                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>

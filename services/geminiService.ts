@@ -7,8 +7,9 @@ export const generateEventIdeas = async (
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  // Règle d'or : On initialise l'instance juste avant l'appel pour avoir la clé la plus récente
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  // CRITICAL: Create instance right before call for Gemini 3 / AI Studio
+  const apiKey = process.env.API_KEY;
+  const ai = new GoogleGenAI({ apiKey: apiKey || '' });
   
   const basePrompt = userProvidedName 
     ? `L'utilisateur veut organiser un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
@@ -17,7 +18,7 @@ export const generateEventIdeas = async (
   const prompt = `${basePrompt} 
     Propose : Un titre, une date précise en ${month}, une description courte (150 car. max) et un émoji.
     IMPORTANT : Le nombre de participants (maxParticipants) doit TOUJOURS être fixé à 4.
-    Réponds uniquement en JSON valide.`;
+    Réponds uniquement en JSON.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -49,31 +50,27 @@ export const generateEventIdeas = async (
       isAiGenerated: true 
     };
   } catch (error: any) {
-    const errorMsg = error?.message?.toLowerCase() || "";
-    console.error("Gemini Critical Error:", error);
+    const errorMsg = error?.message || "";
+    console.error("Gemini Error:", error);
     
-    // Détection des erreurs de clé sur Vercel/AI Studio
-    if (
-      errorMsg.includes("not found") || 
-      errorMsg.includes("invalid") ||
-      errorMsg.includes("401") ||
-      errorMsg.includes("403")
-    ) {
-        throw new Error("KEY_NOT_FOUND");
+    // Détection spécifique demandée par les guidelines
+    if (errorMsg.includes("Requested entity was not found")) {
+      throw new Error("RESET_KEY");
     }
 
-    // Détection spécifique de la facturation (très fréquent sur Gemini 3)
-    if (errorMsg.includes("billing") || errorMsg.includes("pay-as-you-go")) {
-        throw new Error("BILLING_REQUIRED");
+    if (errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("API key not found")) {
+      throw new Error("KEY_NOT_FOUND");
     }
 
-    let userMsg = "Erreur technique IA.";
-    if (errorMsg.includes("429")) userMsg = "Quota dépassé (Trop de demandes).";
-    
+    if (errorMsg.toLowerCase().includes("billing")) {
+      throw new Error("BILLING_REQUIRED");
+    }
+
+    // Fallback gracieux pour les erreurs de quota ou autres
     return {
       title: userProvidedName || `${type} de ${month}`,
       date: `Courant ${month}`,
-      description: `Note : ${userMsg}`,
+      description: `Note: L'IA est momentanément indisponible (Quota ou Facturation).`,
       icon: "⚠️",
       maxParticipants: 4,
       isAiGenerated: false
@@ -84,10 +81,10 @@ export const generateEventIdeas = async (
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-    // Seul Gemini 2.5 supporte googleMaps grounding
+    // Google Maps grounding supporté uniquement sur la série 2.5 pour le moment
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Propose un lieu précis pour "${eventTitle}" en ${month}.`,
+      contents: `Où organiser "${eventTitle}" en ${month} ? Sois très spécifique.`,
       config: { tools: [{ googleMaps: {} }] },
     });
 
@@ -101,7 +98,7 @@ export const suggestLocation = async (eventTitle: string, month: string): Promis
       };
     }
   } catch (e) {
-    console.warn("Maps grounding failed, using default.");
+    console.warn("Location grounding skipped");
   }
   return { name: "Lieu à définir" };
 };
