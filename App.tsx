@@ -8,6 +8,19 @@ import RegistrationModal from './components/RegistrationModal.tsx';
 
 declare var Gun: any;
 
+// Types pour l'API de sélection de clé
+// Correction de l'erreur TypeScript en utilisant le nom d'interface AIStudio attendu par l'environnement
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
+  interface Window {
+    aistudio?: AIStudio;
+  }
+}
+
 const App: React.FC = () => {
   const [events, setEvents] = useState<EventData[]>([]);
   const [inputName, setInputName] = useState<string>('');
@@ -16,8 +29,16 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
 
   useEffect(() => {
+    // Vérifier si une clé est déjà sélectionnée au démarrage
+    if (window.aistudio) {
+      window.aistudio.hasSelectedApiKey().then(has => {
+        setHasApiKey(has);
+      });
+    }
+
     const gun = Gun([
       'https://gun-manhattan.herokuapp.com/gun',
       'https://relay.peer.ooo/gun'
@@ -45,6 +66,14 @@ const App: React.FC = () => {
     return () => node.off();
   }, []);
 
+  const handleOpenKeySelector = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      // On assume que l'utilisateur a fait son choix pour éviter les conditions de course
+      setHasApiKey(true);
+    }
+  };
+
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
     setLoading(true);
@@ -69,8 +98,11 @@ const App: React.FC = () => {
       gunNode.get(id).put(newEventData);
       setInputName('');
       setSelectedType('');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      if (err.message === "KEY_NOT_FOUND") {
+        setHasApiKey(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -102,9 +134,23 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen px-4 py-12 md:py-20 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
-      <div className="fixed top-6 right-6 z-[60] flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-emerald-100">
-        <div className="w-2 h-2 rounded-full bg-emerald-500 sync-indicator"></div>
-        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Base Partagée</span>
+      <div className="fixed top-6 right-6 z-[60] flex flex-col items-end gap-2">
+        <div className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-emerald-100">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 sync-indicator"></div>
+          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Base Partagée</span>
+        </div>
+        
+        {window.aistudio && !hasApiKey && (
+          <button 
+            onClick={handleOpenKeySelector}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-full shadow-lg hover:bg-amber-600 transition-all animate-bounce"
+          >
+            <span className="text-[10px] font-black uppercase tracking-widest">Activer l'IA</span>
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <header className="w-full text-center mb-16">
@@ -114,11 +160,28 @@ const App: React.FC = () => {
         </h1>
         <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">La création de vos plus beaux moments</p>
 
-        {/* Barre de création avec labels verts et bouton Créer */}
+        {window.aistudio && !hasApiKey && (
+          <div className="max-w-xl mx-auto mb-10 p-6 bg-amber-50 border border-amber-200 rounded-[2.5rem] text-left shadow-inner">
+            <h3 className="text-amber-800 font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
+              <span className="text-lg">💡</span> Configuration de l'IA nécessaire
+            </h3>
+            <p className="text-amber-700 text-xs leading-relaxed mb-4">
+              Pour que l'IA puisse générer des idées sur Vercel, vous devez sélectionner une clé API valide. 
+              Utilisez une clé provenant d'un projet GCP avec <strong>facturation activée</strong>.
+              Plus d'infos sur la <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline font-bold">facturation Gemini</a>.
+            </p>
+            <button 
+              onClick={handleOpenKeySelector}
+              className="w-full py-3 bg-amber-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-amber-700 transition-colors shadow-lg"
+            >
+              Sélectionner ma Clé API
+            </button>
+          </div>
+        )}
+
         <div className="max-w-5xl mx-auto">
           <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
             
-            {/* Nom */}
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70 group-focus-within:opacity-100">Nom de l'événement</label>
               <input 
@@ -132,7 +195,6 @@ const App: React.FC = () => {
 
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
 
-            {/* Mois */}
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70 group-focus-within:opacity-100">Période</label>
               <select 
@@ -147,7 +209,6 @@ const App: React.FC = () => {
 
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
 
-            {/* Type */}
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70 group-focus-within:opacity-100">Inspiration</label>
               <select 
@@ -160,7 +221,6 @@ const App: React.FC = () => {
               </select>
             </div>
 
-            {/* Bouton CRÉER */}
             <button 
               onClick={handleAddEvent} 
               disabled={loading || !selectedMonth || !selectedType} 

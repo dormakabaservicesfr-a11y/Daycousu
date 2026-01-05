@@ -8,20 +8,11 @@ export const generateEventIdeas = async (
   userProvidedName?: string,
   usedIcons: string[] = []
 ): Promise<GeminiEventResponse> => {
+  // On récupère la clé au moment de l'appel pour s'assurer d'avoir la plus récente
   const apiKey = process.env.API_KEY;
   
-  if (!apiKey) {
-    return {
-      title: userProvidedName || `${type} de ${month}`,
-      date: `Le 15 ${month}`,
-      description: "⚠️ Variable 'API_KEY' manquante sur Vercel. L'IA ne peut pas répondre.",
-      icon: "❌",
-      maxParticipants: 4,
-      isAiGenerated: false
-    };
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Initialisation de l'IA (le SDK gérera l'absence de clé si elle n'est pas injectée par la plateforme)
+  const ai = new GoogleGenAI({ apiKey: apiKey || '' });
   
   const basePrompt = userProvidedName 
     ? `L'utilisateur veut organiser un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
@@ -53,7 +44,6 @@ export const generateEventIdeas = async (
     });
 
     const data = JSON.parse(response.text || "{}");
-    // On force la valeur à 4 pour corriger toute erreur de l'IA
     return { 
       ...data, 
       maxParticipants: 4, 
@@ -61,6 +51,12 @@ export const generateEventIdeas = async (
     };
   } catch (error: any) {
     console.error("Détail erreur Gemini:", error);
+    
+    // Si l'erreur indique que la clé est manquante ou invalide dans cet environnement
+    if (error?.message?.includes("Requested entity was not found") || error?.message?.includes("API key not found")) {
+        throw new Error("KEY_NOT_FOUND");
+    }
+
     let msg = "Erreur technique IA.";
     if (error?.message?.includes("401")) msg = "Clé API invalide ou expirée.";
     if (error?.message?.includes("429")) msg = "Quota dépassé (trop de requêtes).";
@@ -78,10 +74,8 @@ export const generateEventIdeas = async (
 
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) return { name: "Lieu à définir" };
-
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: apiKey || '' });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Où organiser "${eventTitle}" en ${month} ?`,
