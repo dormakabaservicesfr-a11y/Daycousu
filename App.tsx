@@ -108,7 +108,10 @@ const App: React.FC = () => {
       </div>
 
       <header className="w-full text-center mb-24">
-        <h1 className="text-6xl font-black text-slate-900 mb-4 tracking-tighter">Day 🧵</h1>
+        <h1 className="text-7xl font-black mb-4 tracking-tighter flex items-center justify-center gap-3">
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500">Day</span>
+          <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-500 to-teal-600 drop-shadow-sm brightness-110">🧵</span>
+        </h1>
         <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">Organisation Temps Réel + IA</p>
 
         <div className="glass p-6 md:p-10 rounded-[2.8rem] shadow-2xl max-w-5xl mx-auto flex flex-col lg:flex-row gap-8 items-end bg-white/95 border border-white/80">
