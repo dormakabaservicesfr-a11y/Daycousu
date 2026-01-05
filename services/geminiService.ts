@@ -7,9 +7,15 @@ export const generateEventIdeas = async (
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  // Initialisation à chaque appel pour garantir la fraîcheur de la clé
+  // Récupération de la clé depuis l'environnement injecté
   const apiKey = process.env.API_KEY;
-  const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+  
+  // Vérification critique avant initialisation
+  if (!apiKey || apiKey.trim() === "") {
+    throw new Error("KEY_NOT_FOUND");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const basePrompt = userProvidedName 
     ? `L'utilisateur veut organiser un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
@@ -53,29 +59,26 @@ export const generateEventIdeas = async (
     const errorMsg = error?.message || "Unknown error";
     console.error("Gemini Critical Error:", error);
     
-    // On propage l'erreur pour que l'App puisse afficher l'alerte appropriée
     if (errorMsg.includes("Requested entity was not found")) {
       throw new Error("RESET_KEY");
     }
-    if (errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("API key not found")) {
+    if (errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("API key")) {
       throw new Error("KEY_NOT_FOUND");
     }
     if (errorMsg.toLowerCase().includes("billing") || errorMsg.toLowerCase().includes("pay-as-you-go")) {
       throw new Error("BILLING_REQUIRED");
     }
-    if (errorMsg.includes("429")) {
-      throw new Error("QUOTA_EXCEEDED");
-    }
     
-    // On lance l'erreur avec le message original pour diagnostic
     throw new Error(errorMsg);
   }
 };
 
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-    // Utilisation de 2.5 car le grounding Maps n'est pas encore stable sur Gemini 3 en mode tool
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return { name: "Lieu à définir" };
+
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Suggère un lieu précis pour l'événement "${eventTitle}" en ${month}.`,

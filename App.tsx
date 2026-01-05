@@ -30,12 +30,17 @@ const App: React.FC = () => {
   const [errorInfo, setErrorInfo] = useState<{type: 'KEY' | 'BILLING' | 'QUOTA' | 'OTHER', message: string} | null>(null);
 
   useEffect(() => {
-    if (window.aistudio) {
-      window.aistudio.hasSelectedApiKey().then(has => setHasApiKey(has));
-    }
+    // Vérification de la présence de la clé au chargement
+    const checkKey = async () => {
+      if (window.aistudio) {
+        const has = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(has);
+      }
+    };
+    checkKey();
 
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
-    const node = gun.get('day_app_shared_db_final_v3'); // Version bump for clean start
+    const node = gun.get('day_app_shared_db_v5_final'); 
     setGunNode(node);
 
     node.map().on((data: any, id: string) => {
@@ -60,9 +65,16 @@ const App: React.FC = () => {
 
   const handleOpenKeySelector = async () => {
     if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setHasApiKey(true);
-      setErrorInfo(null);
+      try {
+        await window.aistudio.openSelectKey();
+        // Selon les guidelines, on procède immédiatement après l'appel
+        setHasApiKey(true);
+        setErrorInfo(null);
+      } catch (e) {
+        console.error("Erreur ouverture sélecteur:", e);
+      }
+    } else {
+      alert("Le sélecteur de clé est uniquement disponible dans l'environnement AI Studio.");
     }
   };
 
@@ -90,13 +102,11 @@ const App: React.FC = () => {
       const msg = err.message;
       if (msg === "RESET_KEY" || msg === "KEY_NOT_FOUND") {
         setHasApiKey(false);
-        setErrorInfo({ type: 'KEY', message: "Clé API invalide ou non sélectionnée." });
+        setErrorInfo({ type: 'KEY', message: "Veuillez sélectionner une clé API valide dans AI Studio." });
       } else if (msg === "BILLING_REQUIRED") {
-        setErrorInfo({ type: 'BILLING', message: "La facturation doit être activée sur votre projet Google Cloud pour utiliser Gemini 3 sur ce domaine." });
-      } else if (msg === "QUOTA_EXCEEDED") {
-        setErrorInfo({ type: 'QUOTA', message: "Limite de requêtes atteinte. Réessayez dans une minute." });
+        setErrorInfo({ type: 'BILLING', message: "Facturation requise sur Google Cloud pour ce modèle." });
       } else {
-        setErrorInfo({ type: 'OTHER', message: `Erreur technique : ${msg}` });
+        setErrorInfo({ type: 'OTHER', message: `Erreur : ${msg}` });
       }
     } finally {
       setLoading(false);
@@ -108,13 +118,16 @@ const App: React.FC = () => {
       <div className="fixed top-6 right-6 z-[60] flex flex-col items-end gap-2">
         <div className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-emerald-100">
           <div className="w-2 h-2 rounded-full bg-emerald-500 sync-indicator"></div>
-          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Base Live</span>
+          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Temps Réel</span>
         </div>
-        {(window.aistudio && !hasApiKey) || errorInfo?.type === 'KEY' ? (
-          <button onClick={handleOpenKeySelector} className="px-4 py-2 bg-amber-500 text-white rounded-full shadow-lg font-black text-[10px] uppercase animate-bounce">
-            Sélectionner Clé ✨
+        {!hasApiKey && (
+          <button 
+            onClick={handleOpenKeySelector} 
+            className="px-5 py-2.5 bg-amber-500 text-white rounded-full shadow-xl font-black text-[11px] uppercase animate-pulse border-2 border-white/50"
+          >
+            Activer l'IA ✨
           </button>
-        ) : null}
+        )}
       </div>
 
       <header className="w-full text-center mb-16">
@@ -122,25 +135,28 @@ const App: React.FC = () => {
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500">Day</span>
           <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-500 to-teal-600">🧵</span>
         </h1>
-        <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">L'IA pour vos moments d'exception</p>
+        <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">Organisation simplifiée par l'IA</p>
 
         {errorInfo && (
           <div className={`max-w-2xl mx-auto mb-10 p-6 rounded-[2.5rem] border text-left shadow-2xl animate-in fade-in slide-in-from-top-4 ${errorInfo.type === 'BILLING' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'}`}>
             <h3 className={`font-black text-xs uppercase tracking-widest mb-2 ${errorInfo.type === 'BILLING' ? 'text-amber-800' : 'text-rose-800'}`}>
-              ⚠️ {errorInfo.type === 'BILLING' ? 'Facturation Requise' : 'Erreur Critique IA'}
+              ⚠️ {errorInfo.type === 'BILLING' ? 'Facturation Requise' : 'Problème de Clé API'}
             </h3>
             <p className="text-xs leading-relaxed mb-4 text-slate-600 font-medium">
               {errorInfo.message}
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2">
+              <button 
+                onClick={handleOpenKeySelector} 
+                className="px-6 py-2 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black"
+              >
+                Sélectionner une clé
+              </button>
               {errorInfo.type === 'BILLING' && (
-                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="px-5 py-2 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-amber-700 transition-colors">
-                  Activer la facturation
+                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="px-6 py-2 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full">
+                  Docs Facturation
                 </a>
               )}
-              <button onClick={handleOpenKeySelector} className="px-5 py-2 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black transition-colors">
-                Changer de clé
-              </button>
             </div>
           </div>
         )}
@@ -149,7 +165,7 @@ const App: React.FC = () => {
           <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Événement</label>
-              <input type="text" value={inputName} onChange={(e) => setInputName(e.target.value)} placeholder="Dîner, sortie, voyage..." className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm" />
+              <input type="text" value={inputName} onChange={(e) => setInputName(e.target.value)} placeholder="Dîner, sortie, soirée..." className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm" />
             </div>
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
@@ -163,7 +179,7 @@ const App: React.FC = () => {
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Type</label>
               <select value={selectedType} onChange={(e) => setSelectedType(e.target.value as EventType)} className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer">
-                <option value="" disabled>Style</option>
+                <option value="" disabled>Choisir</option>
                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
