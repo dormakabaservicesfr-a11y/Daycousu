@@ -1,6 +1,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { EventType, GeminiEventResponse, EventLocation } from "../types";
 
+// Déclaration pour informer TypeScript que 'process.env' est injecté par le bundler
+declare var process: {
+  env: {
+    API_KEY: string;
+    [key: string]: string | undefined;
+  };
+};
+
 export const generateEventIdeas = async (
   month: string, 
   type: EventType, 
@@ -9,7 +17,6 @@ export const generateEventIdeas = async (
   const apiKey = process.env.API_KEY;
   if (!apiKey) throw new Error("KEY_NOT_FOUND");
 
-  // Initialisation propre pour Vercel
   const ai = new GoogleGenAI({ apiKey });
   
   const basePrompt = userProvidedName 
@@ -41,7 +48,6 @@ export const generateEventIdeas = async (
       },
     });
 
-    // Utilisation de .text pour extraire le JSON
     const data = JSON.parse(response.text || "{}");
     return { 
       ...data, 
