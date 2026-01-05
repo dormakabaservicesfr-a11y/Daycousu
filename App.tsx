@@ -27,21 +27,22 @@ const App: React.FC = () => {
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
-  const [errorInfo, setErrorInfo] = useState<{type: 'KEY' | 'BILLING' | 'QUOTA' | 'OTHER', message: string} | null>(null);
+  const [errorInfo, setErrorInfo] = useState<{message: string, isKeyError: boolean} | null>(null);
 
   useEffect(() => {
-    // Vérification de la présence de la clé au chargement
+    // Initialisation Gun.js stable
+    const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
+    const node = gun.get('day_app_shared_v8_final'); 
+    setGunNode(node);
+
     const checkKey = async () => {
-      if (window.aistudio) {
-        const has = await window.aistudio.hasSelectedApiKey();
+      const studio = window.aistudio || (window.parent as any).aistudio;
+      if (studio) {
+        const has = await studio.hasSelectedApiKey();
         setHasApiKey(has);
       }
     };
     checkKey();
-
-    const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
-    const node = gun.get('day_app_shared_db_v5_final'); 
-    setGunNode(node);
 
     node.map().on((data: any, id: string) => {
       setEvents(current => {
@@ -64,17 +65,11 @@ const App: React.FC = () => {
   }, []);
 
   const handleOpenKeySelector = async () => {
-    if (window.aistudio) {
-      try {
-        await window.aistudio.openSelectKey();
-        // Selon les guidelines, on procède immédiatement après l'appel
-        setHasApiKey(true);
-        setErrorInfo(null);
-      } catch (e) {
-        console.error("Erreur ouverture sélecteur:", e);
-      }
-    } else {
-      alert("Le sélecteur de clé est uniquement disponible dans l'environnement AI Studio.");
+    const studio = window.aistudio || (window.parent as any).aistudio;
+    if (studio) {
+      await studio.openSelectKey();
+      setHasApiKey(true);
+      setErrorInfo(null);
     }
   };
 
@@ -94,19 +89,16 @@ const App: React.FC = () => {
         month: selectedMonth,
         attendees: JSON.stringify([]),
         location: JSON.stringify(location),
-        isAiGenerated: String(idea.isAiGenerated)
+        isAiGenerated: 'true'
       });
       setInputName('');
       setSelectedType('');
     } catch (err: any) {
-      const msg = err.message;
-      if (msg === "RESET_KEY" || msg === "KEY_NOT_FOUND") {
+      if (err.message === "KEY_NOT_FOUND" || err.message === "RESET_KEY") {
         setHasApiKey(false);
-        setErrorInfo({ type: 'KEY', message: "Veuillez sélectionner une clé API valide dans AI Studio." });
-      } else if (msg === "BILLING_REQUIRED") {
-        setErrorInfo({ type: 'BILLING', message: "Facturation requise sur Google Cloud pour ce modèle." });
+        setErrorInfo({ message: "Veuillez sélectionner une clé API valide.", isKeyError: true });
       } else {
-        setErrorInfo({ type: 'OTHER', message: `Erreur : ${msg}` });
+        setErrorInfo({ message: err.message, isKeyError: false });
       }
     } finally {
       setLoading(false);
@@ -115,15 +107,16 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen px-4 py-12 md:py-20 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
+      {/* Barre de statut supérieure */}
       <div className="fixed top-6 right-6 z-[60] flex flex-col items-end gap-2">
         <div className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-emerald-100">
           <div className="w-2 h-2 rounded-full bg-emerald-500 sync-indicator"></div>
-          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Temps Réel</span>
+          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Live Sync</span>
         </div>
         {!hasApiKey && (
           <button 
             onClick={handleOpenKeySelector} 
-            className="px-5 py-2.5 bg-amber-500 text-white rounded-full shadow-xl font-black text-[11px] uppercase animate-pulse border-2 border-white/50"
+            className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-full shadow-xl font-black text-[11px] uppercase animate-pulse border-2 border-white/50"
           >
             Activer l'IA ✨
           </button>
@@ -138,26 +131,14 @@ const App: React.FC = () => {
         <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">Organisation simplifiée par l'IA</p>
 
         {errorInfo && (
-          <div className={`max-w-2xl mx-auto mb-10 p-6 rounded-[2.5rem] border text-left shadow-2xl animate-in fade-in slide-in-from-top-4 ${errorInfo.type === 'BILLING' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'}`}>
-            <h3 className={`font-black text-xs uppercase tracking-widest mb-2 ${errorInfo.type === 'BILLING' ? 'text-amber-800' : 'text-rose-800'}`}>
-              ⚠️ {errorInfo.type === 'BILLING' ? 'Facturation Requise' : 'Problème de Clé API'}
-            </h3>
-            <p className="text-xs leading-relaxed mb-4 text-slate-600 font-medium">
-              {errorInfo.message}
-            </p>
-            <div className="flex gap-2">
-              <button 
-                onClick={handleOpenKeySelector} 
-                className="px-6 py-2 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black"
-              >
-                Sélectionner une clé
+          <div className={`max-w-2xl mx-auto mb-10 p-5 rounded-[2.5rem] border text-left shadow-xl animate-in fade-in slide-in-from-top-4 ${errorInfo.isKeyError ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'}`}>
+            <p className="text-xs font-black uppercase tracking-widest mb-1 text-slate-400">Attention</p>
+            <p className="text-sm font-bold text-slate-700">{errorInfo.message}</p>
+            {errorInfo.isKeyError && (
+              <button onClick={handleOpenKeySelector} className="mt-3 px-6 py-2 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-full">
+                Saisir une clé
               </button>
-              {errorInfo.type === 'BILLING' && (
-                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="px-6 py-2 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full">
-                  Docs Facturation
-                </a>
-              )}
-            </div>
+            )}
           </div>
         )}
 
@@ -165,12 +146,22 @@ const App: React.FC = () => {
           <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Événement</label>
-              <input type="text" value={inputName} onChange={(e) => setInputName(e.target.value)} placeholder="Dîner, sortie, soirée..." className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm" />
+              <input 
+                type="text" 
+                value={inputName} 
+                onChange={(e) => setInputName(e.target.value)} 
+                placeholder="Titre libre (ou laissez vide)" 
+                className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm" 
+              />
             </div>
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Mois</label>
-              <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer">
+              <select 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(e.target.value)} 
+                className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer"
+              >
                 <option value="" disabled>Choisir</option>
                 {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
@@ -178,12 +169,20 @@ const App: React.FC = () => {
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Type</label>
-              <select value={selectedType} onChange={(e) => setSelectedType(e.target.value as EventType)} className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer">
+              <select 
+                value={selectedType} 
+                onChange={(e) => setSelectedType(e.target.value as EventType)} 
+                className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer"
+              >
                 <option value="" disabled>Choisir</option>
                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <button onClick={handleAddEvent} disabled={loading || !selectedMonth || !selectedType} className={`m-1 px-10 py-4 rounded-[2rem] font-black text-white shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 ${loading || !selectedMonth || !selectedType ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-br from-emerald-500 to-teal-600 hover:shadow-emerald-200/50'}`}>
+            <button 
+              onClick={handleAddEvent} 
+              disabled={loading || !selectedMonth || !selectedType} 
+              className={`m-1 px-10 py-4 rounded-[2rem] font-black text-white shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 ${loading || !selectedMonth || !selectedType ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-br from-emerald-500 to-teal-600 hover:shadow-emerald-200/50'}`}
+            >
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <span className="tracking-[0.2em] text-[11px]">CRÉER</span>}
             </button>
           </div>
@@ -199,7 +198,13 @@ const App: React.FC = () => {
             </h2>
             <div className="flex-1 flex flex-wrap content-start justify-center gap-6 relative z-10">
               {events.filter(e => e.month === month).map(event => (
-                <EventBubble key={event.id} event={event} canEdit={true} onClick={() => setActiveEvent(event)} onDelete={() => gunNode.get(event.id).put(null)} />
+                <EventBubble 
+                  key={event.id} 
+                  event={event} 
+                  canEdit={true} 
+                  onClick={() => setActiveEvent(event)} 
+                  onDelete={() => gunNode.get(event.id).put(null)} 
+                />
               ))}
             </div>
           </section>
@@ -208,7 +213,9 @@ const App: React.FC = () => {
 
       {activeEvent && (
         <RegistrationModal 
-          event={activeEvent} canEdit={true} onClose={() => setActiveEvent(null)} 
+          event={activeEvent} 
+          canEdit={true} 
+          onClose={() => setActiveEvent(null)} 
           onRegister={(name) => {
             const updated = [...(activeEvent.attendees || []), name];
             gunNode.get(activeEvent.id).get('attendees').put(JSON.stringify(updated));

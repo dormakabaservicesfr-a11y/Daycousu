@@ -7,30 +7,28 @@ export const generateEventIdeas = async (
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  // Récupération de la clé depuis l'environnement injecté
   const apiKey = process.env.API_KEY;
-  
-  // Vérification critique avant initialisation
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error("KEY_NOT_FOUND");
-  }
+  if (!apiKey) throw new Error("KEY_NOT_FOUND");
 
+  // Création d'une nouvelle instance à chaque appel comme recommandé
   const ai = new GoogleGenAI({ apiKey });
   
   const basePrompt = userProvidedName 
-    ? `L'utilisateur veut organiser un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
-    : `Génère une idée d'événement créative et originale pour le mois de ${month} de type "${type}".`;
+    ? `Organise un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
+    : `Génère une idée d'événement inédite et excitante pour ${month} (${type}).`;
 
   const prompt = `${basePrompt} 
-    Propose : Un titre, une date précise en ${month}, une description courte (150 car. max) et un émoji.
-    Le nombre de participants (maxParticipants) doit être fixé à 4.
-    Réponds en JSON uniquement.`;
+    Détails requis : Titre accrocheur, date logique en ${month}, description immersive (140 car. max), un emoji thématique.
+    Participants max : 4.
+    Réponds exclusivement en JSON.`;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
+        // Activation du mode réflexion pour une meilleure créativité
+        thinkingConfig: { thinkingBudget: 2000 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -46,30 +44,21 @@ export const generateEventIdeas = async (
       },
     });
 
-    const text = response.text;
-    if (!text) throw new Error("EMPTY_RESPONSE");
-
-    const data = JSON.parse(text);
+    const data = JSON.parse(response.text || "{}");
     return { 
       ...data, 
       maxParticipants: 4, 
       isAiGenerated: true 
     };
   } catch (error: any) {
-    const errorMsg = error?.message || "Unknown error";
-    console.error("Gemini Critical Error:", error);
-    
-    if (errorMsg.includes("Requested entity was not found")) {
-      throw new Error("RESET_KEY");
-    }
-    if (errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("API key")) {
+    const errorMsg = error?.message || "";
+    if (errorMsg.includes("API key") || errorMsg.includes("invalid") || errorMsg.includes("401")) {
       throw new Error("KEY_NOT_FOUND");
     }
-    if (errorMsg.toLowerCase().includes("billing") || errorMsg.toLowerCase().includes("pay-as-you-go")) {
-      throw new Error("BILLING_REQUIRED");
+    if (errorMsg.includes("quota") || errorMsg.includes("429")) {
+      throw new Error("QUOTA_EXCEEDED");
     }
-    
-    throw new Error(errorMsg);
+    throw error;
   }
 };
 
@@ -80,22 +69,18 @@ export const suggestLocation = async (eventTitle: string, month: string): Promis
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Suggère un lieu précis pour l'événement "${eventTitle}" en ${month}.`,
+      model: "gemini-2.5-flash-lite-latest",
+      contents: `Suggère un lieu réel et approprié pour "${eventTitle}" en ${month}.`,
       config: { tools: [{ googleMaps: {} }] },
     });
 
     const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     const mapsChunk = chunks?.find(chunk => chunk.maps);
     
-    if (mapsChunk?.maps) {
-      return { 
-        name: mapsChunk.maps.title, 
-        mapsUri: mapsChunk.maps.uri 
-      };
-    }
+    return mapsChunk?.maps 
+      ? { name: mapsChunk.maps.title, mapsUri: mapsChunk.maps.uri }
+      : { name: "Lieu à définir" };
   } catch (e) {
-    console.warn("Location fetch failed");
+    return { name: "Lieu à définir" };
   }
-  return { name: "Lieu à définir" };
 };
