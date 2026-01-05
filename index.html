@@ -7,18 +7,15 @@
   <meta name="theme-color" content="#10b981">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Day 🧵">
+  <meta name="apple-mobile-web-app-title" content="Day 🪡">
   
-  <title>Day 🧵 - Organisation d'événements</title>
+  <title>Day 🪡 - Organisation d'événements</title>
   
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/8112/8112520.png">
   
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Retour à la police élégante : Plus Jakarta Sans -->
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- Gun.js pour la base de données partagée temps réel -->
   <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
   
   <style>
@@ -55,9 +52,18 @@
       100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
     
-    /* Smooth transitions pour les changements d'état */
     * {
       transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    /* Style du fil qui part du Y */
+    .thread-path {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      animation: drawThread 2s ease-out forwards;
+    }
+    @keyframes drawThread {
+      to { stroke-dashoffset: 0; }
     }
   </style>
 
@@ -76,17 +82,6 @@
 </head>
 <body>
   <div id="root"></div>
-  
   <script type="module" src="index.tsx"></script>
-  
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-          .then(reg => console.log('SW Registered'))
-          .catch(err => console.warn('SW Skip:', err.message));
-      });
-    }
-  </script>
 </body>
 </html>

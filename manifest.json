@@ -1,7 +1,7 @@
 
 {
-  "name": "Day 🧵 - Organisation d'événements",
-  "short_name": "Day 🧵",
+  "name": "Day 🪡 - Organisation d'événements",
+  "short_name": "Day 🪡",
   "description": "Planifiez vos moments d'exception chaque mois.",
   "start_url": "./index.html",
   "display": "standalone",
@@ -10,13 +10,13 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3652/3652191.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/8112/8112520.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/192/3652/3652191.png",
+      "src": "https://cdn-icons-png.flaticon.com/192/8112/8112520.png",
       "sizes": "192x192",
       "type": "image/png"
     }

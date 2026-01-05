@@ -1,6 +1,6 @@
 {
-  "name": "Day 🧵",
-  "description": "Une application élégante pour organiser vos événements mensuels en un clin d'œil.",
+  "name": "Day 🪡",
+  "description": "Une application élégante pour organiser vos événements mensuels avec la précision d'une aiguille.",
   "requestFramePermissions": [
     "geolocation"
   ]
