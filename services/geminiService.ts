@@ -1,6 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { EventType, GeminiEventResponse, EventLocation } from "../types.ts";
+import { EventType, GeminiEventResponse, EventLocation } from "../types";
 
 export const generateEventIdeas = async (
   month: string, 

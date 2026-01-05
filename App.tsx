@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
-import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants.tsx';
-import { EventType, EventData } from './types.ts';
-import { generateEventIdeas, suggestLocation } from './services/geminiService.ts';
-import EventBubble from './components/EventBubble.tsx';
-import RegistrationModal from './components/RegistrationModal.tsx';
+import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants';
+import { EventType, EventData } from './types';
+import { generateEventIdeas, suggestLocation } from './services/geminiService';
+import EventBubble from './components/EventBubble';
+import RegistrationModal from './components/RegistrationModal';
 
 declare var Gun: any;
 
@@ -23,14 +22,6 @@ const App: React.FC = () => {
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_final_stable_v1'); 
     setGunNode(node);
-
-    // Vérification de la clé API au démarrage
-    if (!process.env.API_KEY) {
-      setErrorInfo({ 
-        message: "Clé API non détectée. Assurez-vous d'avoir configuré 'API_KEY' dans les variables d'environnement Vercel.", 
-        isKeyError: true 
-      });
-    }
 
     node.map().on((data: any, id: string) => {
       setEvents(current => {
