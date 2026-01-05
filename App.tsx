@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants.tsx';
 import { EventType, EventData } from './types.ts';
 import { generateEventIdeas, suggestLocation } from './services/geminiService.ts';
@@ -27,17 +27,14 @@ const App: React.FC = () => {
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<{title: string, detail: string, isBilling?: boolean} | null>(null);
 
   useEffect(() => {
     if (window.aistudio) {
       window.aistudio.hasSelectedApiKey().then(has => setHasApiKey(has));
     }
 
-    const gun = Gun([
-      'https://gun-manhattan.herokuapp.com/gun',
-      'https://relay.peer.ooo/gun'
-    ]);
+    const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_shared_db_final_v1');
     setGunNode(node);
 
@@ -79,56 +76,37 @@ const App: React.FC = () => {
       const location = await suggestLocation(idea.title, selectedMonth);
       const id = Math.random().toString(36).substr(2, 9);
       
-      const newEventData = {
-        title: idea.title,
-        date: idea.date,
-        description: idea.description,
-        icon: idea.icon, 
+      gunNode.get(id).put({
+        ...idea,
         type: selectedType,
         month: selectedMonth,
         attendees: JSON.stringify([]),
-        maxParticipants: idea.maxParticipants,
         location: JSON.stringify(location),
         isAiGenerated: String(idea.isAiGenerated)
-      };
-
-      gunNode.get(id).put(newEventData);
+      });
       setInputName('');
       setSelectedType('');
     } catch (err: any) {
-      console.error("App catch:", err);
       if (err.message === "KEY_NOT_FOUND") {
         setHasApiKey(false);
-        setErrorMessage("Clé API manquante ou invalide. Veuillez en sélectionner une nouvelle.");
+        setErrorMessage({
+          title: "Clé API non reconnue",
+          detail: "Veuillez sélectionner une clé valide via le bouton Activer l'IA."
+        });
+      } else if (err.message === "BILLING_REQUIRED") {
+        setErrorMessage({
+          title: "Facturation requise",
+          detail: "Gemini 3 nécessite un compte Google Cloud avec facturation activée pour fonctionner sur ce domaine.",
+          isBilling: true
+        });
       } else {
-        setErrorMessage("L'IA a rencontré une difficulté. Vérifiez votre quota ou votre connexion.");
+        setErrorMessage({
+          title: "Indisponibilité temporaire",
+          detail: "L'IA ne répond pas. Vérifiez vos quotas dans Google AI Studio."
+        });
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleRegister = (name: string) => {
-    if (activeEvent && gunNode) {
-      const updated = [...(activeEvent.attendees || []), name];
-      gunNode.get(activeEvent.id).get('attendees').put(JSON.stringify(updated));
-      setActiveEvent({ ...activeEvent, attendees: updated });
-    }
-  };
-
-  const handleUnregister = (index: number) => {
-    if (activeEvent && gunNode) {
-      const updated = [...(activeEvent.attendees || [])];
-      updated.splice(index, 1);
-      gunNode.get(activeEvent.id).get('attendees').put(JSON.stringify(updated));
-      setActiveEvent({ ...activeEvent, attendees: updated });
-    }
-  };
-
-  const handleUpdateField = (id: string, field: string, value: any) => {
-    if (gunNode) {
-      const val = (field === 'attendees' || field === 'location') ? JSON.stringify(value) : value;
-      gunNode.get(id).get(field).put(val);
     }
   };
 
@@ -137,15 +115,11 @@ const App: React.FC = () => {
       <div className="fixed top-6 right-6 z-[60] flex flex-col items-end gap-2">
         <div className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-emerald-100">
           <div className="w-2 h-2 rounded-full bg-emerald-500 sync-indicator"></div>
-          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Base Partagée</span>
+          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Temps Réel</span>
         </div>
-        
         {window.aistudio && !hasApiKey && (
-          <button 
-            onClick={handleOpenKeySelector}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-full shadow-lg hover:bg-amber-600 transition-all animate-bounce"
-          >
-            <span className="text-[10px] font-black uppercase tracking-widest">Activer l'IA</span>
+          <button onClick={handleOpenKeySelector} className="px-4 py-2 bg-amber-500 text-white rounded-full shadow-lg font-black text-[10px] uppercase animate-pulse">
+            Activer l'IA ✨
           </button>
         )}
       </div>
@@ -153,87 +127,50 @@ const App: React.FC = () => {
       <header className="w-full text-center mb-16">
         <h1 className="text-7xl font-black mb-4 tracking-tighter flex items-center justify-center gap-3">
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500">Day</span>
-          <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-500 to-teal-600 drop-shadow-sm brightness-110">🧵</span>
+          <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-500 to-teal-600 drop-shadow-sm">🧵</span>
         </h1>
-        <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">La création de vos plus beaux moments</p>
+        <p className="text-slate-400 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">L'IA au service de vos événements</p>
 
         {errorMessage && (
-          <div className="max-w-xl mx-auto mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-[10px] font-bold uppercase tracking-widest animate-in fade-in slide-in-from-top-2">
-            ⚠️ {errorMessage}
-          </div>
-        )}
-
-        {window.aistudio && !hasApiKey && (
-          <div className="max-w-xl mx-auto mb-10 p-6 bg-amber-50 border border-amber-200 rounded-[2.5rem] text-left shadow-inner">
-            <h3 className="text-amber-800 font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
-              <span className="text-lg">💡</span> Action requise : Sélection de Clé
+          <div className={`max-w-2xl mx-auto mb-8 p-6 rounded-[2rem] border text-left shadow-xl animate-in fade-in slide-in-from-top-4 ${errorMessage.isBilling ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'}`}>
+            <h3 className={`font-black text-xs uppercase tracking-widest mb-2 ${errorMessage.isBilling ? 'text-amber-800' : 'text-rose-800'}`}>
+              ⚠️ {errorMessage.title}
             </h3>
-            <p className="text-amber-700 text-xs leading-relaxed mb-4">
-              Pour utiliser Gemini 3 sur Vercel, vous devez fournir votre propre clé API issue d'un projet avec <strong>facturation activée</strong>.
-              <br/><br/>
-              Consultez la <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline font-bold">doc facturation</a>.
+            <p className={`text-xs leading-relaxed mb-4 ${errorMessage.isBilling ? 'text-amber-700' : 'text-rose-700'}`}>
+              {errorMessage.detail}
             </p>
-            <button 
-              onClick={handleOpenKeySelector}
-              className="w-full py-3 bg-amber-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-amber-700 transition-colors shadow-lg"
-            >
-              Sélectionner ma Clé API Pay-as-you-go
-            </button>
+            {errorMessage.isBilling && (
+              <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-2 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-amber-700">
+                Voir la documentation Facturation
+              </a>
+            )}
           </div>
         )}
 
         <div className="max-w-5xl mx-auto">
           <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Nom de l'événement</label>
-              <input 
-                type="text" 
-                value={inputName} 
-                onChange={(e) => setInputName(e.target.value)} 
-                placeholder="Ex: Soirée Jeux..." 
-                className="bg-transparent w-full outline-none font-bold text-slate-700 placeholder:text-slate-300 text-sm" 
-              />
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Événement</label>
+              <input type="text" value={inputName} onChange={(e) => setInputName(e.target.value)} placeholder="Soirée, activité..." className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm" />
             </div>
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Période</label>
-              <select 
-                value={selectedMonth} 
-                onChange={(e) => setSelectedMonth(e.target.value)} 
-                className="bg-transparent w-full outline-none font-bold text-slate-600 cursor-pointer text-sm appearance-none"
-              >
-                <option value="" disabled>Choisir un mois</option>
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Mois</label>
+              <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer">
+                <option value="" disabled>Choisir</option>
                 {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div className="h-10 w-[1px] bg-slate-200/50 self-center hidden md:block"></div>
             <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Inspiration</label>
-              <select 
-                value={selectedType} 
-                onChange={(e) => setSelectedType(e.target.value as EventType)} 
-                className="bg-transparent w-full outline-none font-bold text-slate-600 cursor-pointer text-sm appearance-none"
-              >
-                <option value="" disabled>Type</option>
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Type</label>
+              <select value={selectedType} onChange={(e) => setSelectedType(e.target.value as EventType)} className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer">
+                <option value="" disabled>Style</option>
                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <button 
-              onClick={handleAddEvent} 
-              disabled={loading || !selectedMonth || !selectedType} 
-              className={`
-                m-1 px-10 py-4 rounded-[2rem] font-black text-white shadow-lg transition-all 
-                flex items-center justify-center gap-2 active:scale-95
-                ${loading || !selectedMonth || !selectedType 
-                  ? 'bg-slate-200 shadow-none cursor-not-allowed text-slate-400' 
-                  : 'bg-gradient-to-br from-emerald-500 to-teal-600 hover:shadow-emerald-200/50 hover:-translate-y-0.5'}
-              `}
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <span className="tracking-[0.2em] text-[11px]">CRÉER</span>
-              )}
+            <button onClick={handleAddEvent} disabled={loading || !selectedMonth || !selectedType} className={`m-1 px-10 py-4 rounded-[2rem] font-black text-white shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 ${loading || !selectedMonth || !selectedType ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-br from-emerald-500 to-teal-600 hover:shadow-emerald-200/50'}`}>
+              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <span className="tracking-[0.2em] text-[11px]">CRÉER</span>}
             </button>
           </div>
         </div>
@@ -241,7 +178,7 @@ const App: React.FC = () => {
 
       <main className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {MONTHS.map((month) => (
-          <section key={month} id={`month-${month}`} className={`group relative flex flex-col min-h-[400px] p-8 rounded-[3.5rem] border transition-all ${MONTH_THEMES[month].bg} ${MONTH_THEMES[month].border}`}>
+          <section key={month} className={`group relative flex flex-col min-h-[400px] p-8 rounded-[3.5rem] border transition-all ${MONTH_THEMES[month].bg} ${MONTH_THEMES[month].border}`}>
             <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 mb-8 ${MONTH_THEMES[month].text}`}>
               <span className={`w-2 h-8 rounded-full ${MONTH_THEMES[month].accent}`}></span>
               {month}
@@ -257,11 +194,26 @@ const App: React.FC = () => {
 
       {activeEvent && (
         <RegistrationModal 
-          event={activeEvent} canEdit={true} onClose={() => setActiveEvent(null)} onRegister={handleRegister} onUnregister={handleUnregister}
-          onUpdateLocation={(loc) => { const updated = { name: loc, mapsUri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}` }; gunNode.get(activeEvent.id).get('location').put(JSON.stringify(updated)); setActiveEvent({...activeEvent, location: updated}); }}
-          onUpdateDate={(val) => handleUpdateField(activeEvent.id, 'date', val)}
-          onUpdateDescription={(val) => handleUpdateField(activeEvent.id, 'description', val)}
-          onUpdateMaxParticipants={(val) => handleUpdateField(activeEvent.id, 'maxParticipants', val)}
+          event={activeEvent} canEdit={true} onClose={() => setActiveEvent(null)} 
+          onRegister={(name) => {
+            const updated = [...(activeEvent.attendees || []), name];
+            gunNode.get(activeEvent.id).get('attendees').put(JSON.stringify(updated));
+            setActiveEvent({ ...activeEvent, attendees: updated });
+          }} 
+          onUnregister={(index) => {
+            const updated = [...(activeEvent.attendees || [])];
+            updated.splice(index, 1);
+            gunNode.get(activeEvent.id).get('attendees').put(JSON.stringify(updated));
+            setActiveEvent({ ...activeEvent, attendees: updated });
+          }}
+          onUpdateLocation={(loc) => { 
+            const updated = { name: loc, mapsUri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}` }; 
+            gunNode.get(activeEvent.id).get('location').put(JSON.stringify(updated)); 
+            setActiveEvent({...activeEvent, location: updated}); 
+          }}
+          onUpdateDate={(val) => { gunNode.get(activeEvent.id).get('date').put(val); setActiveEvent({...activeEvent, date: val}); }}
+          onUpdateDescription={(val) => { gunNode.get(activeEvent.id).get('description').put(val); setActiveEvent({...activeEvent, description: val}); }}
+          onUpdateMaxParticipants={(val) => { gunNode.get(activeEvent.id).get('maxParticipants').put(val); setActiveEvent({...activeEvent, maxParticipants: val}); }}
         />
       )}
     </div>
