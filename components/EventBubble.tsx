@@ -137,13 +137,9 @@ const EventBubble: React.FC<EventBubbleProps> = ({
                   </svg>
                 ) : (
                   <svg viewBox="0 0 48 48" className={`h-6 w-6 ${isExpired ? 'opacity-40 grayscale' : ''}`} xmlns="http://www.w3.org/2000/svg">
-                    {/* Top: Red */}
                     <path fill="#EA4335" d="M24 4c-7.73 0-14 6.27-14 14 0 3.1 1.01 6.13 2.87 8.65L24 18V4z"/>
-                    {/* Right: Yellow */}
                     <path fill="#FBBC04" d="M24 4v14l11.13 8.65C36.99 24.13 38 21.1 38 18c0-7.73-6.27-14-14-14z"/>
-                    {/* Bottom: Green */}
                     <path fill="#34A853" d="M12.87 26.65L24 42l11.13-15.35L24 18l-11.13 8.65z"/>
-                    {/* Center: Blue */}
                     <path fill="#4285F4" d="M24 14c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"/>
                   </svg>
                 )}

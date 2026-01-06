@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { EventData } from '../types';
 import EventBubble from './EventBubble';
+import { MONTHS } from '../constants';
 
 interface BubbleStackProps {
   events: EventData[];
@@ -13,23 +14,66 @@ interface BubbleStackProps {
 const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick, onEventDelete }) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
-  if (events.length === 0) return null;
+  // Helper pour parser la date "JOUR MOIS"
+  const parseEventDate = (dateStr: string): Date => {
+    const now = new Date();
+    const [dayStr, monthStr] = dateStr.split(' ');
+    const day = parseInt(dayStr);
+    const monthIndex = MONTHS.indexOf(monthStr);
+    if (monthIndex === -1 || isNaN(day)) return new Date(0);
+    return new Date(now.getFullYear(), monthIndex, day);
+  };
+
+  // Tri des événements : Futurs d'abord (du plus proche au plus lointain), puis Passés (du plus récent au plus ancien)
+  const sortedEvents = useMemo(() => {
+    const now = new Date();
+    const nowTime = now.getTime();
+
+    const checkIsExpired = (dateStr: string) => {
+      const [dayStr, monthStr] = dateStr.split(' ');
+      const day = parseInt(dayStr);
+      const monthIndex = MONTHS.indexOf(monthStr);
+      if (monthIndex === -1 || isNaN(day)) return true;
+      
+      const eventDate = new Date(now.getFullYear(), monthIndex, day);
+      // Un événement est expiré 24h après le début de sa journée (même logique que EventBubble)
+      const threshold = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000);
+      return nowTime > threshold.getTime();
+    };
+
+    const upcoming = events
+      .filter(e => !checkIsExpired(e.date))
+      .sort((a, b) => parseEventDate(a.date).getTime() - parseEventDate(b.date).getTime());
+
+    const expired = events
+      .filter(e => checkIsExpired(e.date))
+      .sort((a, b) => parseEventDate(b.date).getTime() - parseEventDate(a.date).getTime());
+
+    return [...upcoming, ...expired];
+  }, [events]);
+
+  // Réinitialiser l'index si la liste change (pour rester sur l'événement prioritaire par défaut)
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [events.length]);
+
+  if (sortedEvents.length === 0) return null;
 
   const next = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setActiveIndex((prev) => (prev + 1) % events.length);
+    setActiveIndex((prev) => (prev + 1) % sortedEvents.length);
   };
 
   const prev = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setActiveIndex((prev) => (prev - 1 + events.length) % events.length);
+    setActiveIndex((prev) => (prev - 1 + sortedEvents.length) % sortedEvents.length);
   };
 
-  // Si 1 ou 2 événements, on les affiche normalement côte à côte
-  if (events.length <= 2) {
+  // Si seulement 1 événement, on l'affiche normalement
+  if (sortedEvents.length < 2) {
     return (
       <div className="flex flex-wrap justify-center gap-6">
-        {events.map((event) => (
+        {sortedEvents.map((event) => (
           <EventBubble
             key={event.id}
             event={event}
@@ -42,11 +86,13 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
     );
   }
 
-  // Si plus de 2, on active l'empilement uniforme de gauche à droite
+  // Si 2 ou plus, on active l'empilement (Stack)
   const visibleEvents = [];
-  for (let i = 0; i < Math.min(events.length, 3); i++) {
-    const index = (activeIndex + i) % events.length;
-    visibleEvents.push({ event: events[index], isBackground: i > 0, depth: i });
+  const count = sortedEvents.length;
+  // On affiche jusqu'à 3 bulles dans l'aperçu de la pile
+  for (let i = 0; i < Math.min(count, 3); i++) {
+    const index = (activeIndex + i) % count;
+    visibleEvents.push({ event: sortedEvents[index], isBackground: i > 0, depth: i });
   }
 
   return (
@@ -68,11 +114,10 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
             key={event.id}
             className="absolute transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             style={{ 
-              // Décalage horizontal réduit de moitié (15px au lieu de 30px)
-              // translateX(-depth * 15px) : les bulles derrière apparaissent légèrement sur la gauche.
+              // Décalage horizontal augmenté de 10% supplémentaire (16.5px -> 18.15px)
               transform: isBackground 
-                ? `translateX(-${depth * 15}px)` 
-                : 'translateX(0)',
+                ? `translateX(-${depth * 18.15}px) scale(${1 - depth * 0.05})` 
+                : 'translateX(0) scale(1)',
               zIndex: 30 - depth,
               opacity: 1 - depth * 0.25
             }}
@@ -99,7 +144,7 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
 
       {/* Indicateur de pagination */}
       <div className="absolute -bottom-6 flex gap-1.5">
-        {events.map((_, idx) => (
+        {sortedEvents.map((_, idx) => (
           <div 
             key={idx}
             className={`h-1.5 rounded-full transition-all duration-500 ${idx === activeIndex ? 'w-5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'w-1.5 bg-slate-300'}`}

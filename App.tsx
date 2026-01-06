@@ -18,9 +18,6 @@ const App: React.FC = () => {
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
 
-  // Références pour le défilement vers les mois
-  const monthRefs = useRef<{ [key: string]: HTMLElement | null }>({});
-
   useEffect(() => {
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_prod_v2_stable'); 
@@ -49,13 +46,6 @@ const App: React.FC = () => {
     });
     return () => node.off();
   }, []);
-
-  // Déclenche le défilement quand le mois change via le select
-  useEffect(() => {
-    if (selectedMonth && monthRefs.current[selectedMonth]) {
-      monthRefs.current[selectedMonth]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [selectedMonth]);
 
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
@@ -128,7 +118,7 @@ const App: React.FC = () => {
         <div className="max-w-5xl w-full mx-auto">
           <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Sujet (Optionnel)</label>
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">NOM EVENEMENT</label>
               <input 
                 type="text" 
                 value={inputName} 
@@ -176,7 +166,6 @@ const App: React.FC = () => {
         {MONTHS.map((month) => (
           <section 
             key={month} 
-            ref={(el) => { if (el) monthRefs.current[month] = el; }}
             className={`group relative flex flex-col min-h-[400px] p-8 rounded-[3.5rem] border transition-all duration-700 ${MONTH_THEMES[month].bg} ${selectedMonth === month ? 'border-emerald-400 ring-4 ring-emerald-500/10 shadow-2xl scale-[1.02]' : MONTH_THEMES[month].border} hover:shadow-xl`}
           >
             <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 mb-8 ${MONTH_THEMES[month].text}`}>
