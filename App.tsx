@@ -90,12 +90,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen px-4 py-12 md:py-20 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
-      <div className="fixed top-6 right-6 z-[60]">
-        <div className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-emerald-100">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 sync-indicator"></div>
-          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Live Sync</span>
-        </div>
-      </div>
+      {/* Le badge Live Sync a été retiré */}
 
       <header className="w-full text-center mb-16 flex flex-col items-center">
         <div className="relative mb-6">

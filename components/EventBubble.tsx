@@ -69,11 +69,14 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
         </div>
       ) : (
         <>
-          <span className="text-3xl mb-1">{event.icon}</span>
-          <h3 className="font-bold text-[11px] leading-tight mb-0.5 line-clamp-2 uppercase tracking-wide px-2">
-            {event.title}
-          </h3>
-          <p className="text-[9px] font-bold opacity-80">{event.date}</p>
+          {/* Contenu remonté de 10% (-translate-y-4 car 16px/160px = 10%) */}
+          <div className="flex flex-col items-center -translate-y-4">
+            <span className="text-3xl mb-1">{event.icon}</span>
+            <h3 className="font-bold text-[11px] leading-tight mb-0.5 line-clamp-2 uppercase tracking-wide px-2">
+              {event.title}
+            </h3>
+            <p className="text-[9px] font-bold opacity-80">{event.date}</p>
+          </div>
           
           {canEdit && (
             <button 
