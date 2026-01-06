@@ -1,30 +1,25 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { EventType, GeminiEventResponse, EventLocation } from "../types";
 
-// Déclaration pour informer TypeScript que 'process.env' est injecté par le bundler
-declare var process: {
-  env: {
-    API_KEY: string;
-    [key: string]: string | undefined;
-  };
-};
+import { GoogleGenAI, Type } from "@google/genai";
+import { EventType, GeminiEventResponse, EventLocation } from "../types.ts";
 
 export const generateEventIdeas = async (
   month: string, 
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("KEY_NOT_FOUND");
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Fix: Initialize GoogleGenAI with process.env.API_KEY as a named parameter
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const basePrompt = userProvidedName 
     ? `Organise un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
     : `Génère une idée d'événement inédite et excitante pour ${month} (${type}).`;
 
   const prompt = `${basePrompt} 
-    Détails requis : Titre accrocheur, date logique en ${month}, description immersive (140 car. max), un emoji thématique.
+    Détails requis : 
+    - Titre accrocheur.
+    - Date logique strictement au format "CHIFFRE MOIS" (ex: "21 ${month}"). Ne pas ajouter de mots comme "Le".
+    - Description immersive (140 car. max).
+    - Un emoji thématique.
     Participants max : 4.
     Réponds exclusivement en JSON.`;
 
@@ -48,6 +43,7 @@ export const generateEventIdeas = async (
       },
     });
 
+    // Fix: Access response.text directly (it is a property, not a method)
     const data = JSON.parse(response.text || "{}");
     return { 
       ...data, 
@@ -65,15 +61,14 @@ export const generateEventIdeas = async (
 
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
   try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return { name: "Lieu à définir" };
-
-    const ai = new GoogleGenAI({ apiKey });
+    // Fix: Initialize GoogleGenAI with process.env.API_KEY directly
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Suggère un lieu réel et approprié pour l'événement "${eventTitle}" qui a lieu en ${month}. Réponds juste le nom du lieu et la ville.`,
     });
 
+    // Fix: Access response.text directly
     const locationName = response.text?.trim() || "Lieu à définir";
     
     return { 
