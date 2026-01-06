@@ -181,7 +181,7 @@ const App: React.FC = () => {
         {MONTHS.map((month) => (
           <section 
             key={month} 
-            ref={el => monthRefs.current[month] = el}
+            ref={(el) => { monthRefs.current[month] = el; }}
             className={`group relative flex flex-col min-h-[400px] p-8 rounded-[3.5rem] border transition-all duration-700 ${MONTH_THEMES[month].bg} ${selectedMonth === month ? 'border-emerald-400 ring-4 ring-emerald-500/10 shadow-2xl scale-[1.02]' : MONTH_THEMES[month].border} hover:shadow-xl`}
           >
             <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 mb-8 ${MONTH_THEMES[month].text}`}>

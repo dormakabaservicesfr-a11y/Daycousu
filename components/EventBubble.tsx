@@ -86,7 +86,7 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
             </button>
           )}
 
-          {/* Bouton Google Maps (Copie) */}
+          {/* Bouton Google Maps (Copie) - Bas Gauche */}
           <button 
             onClick={handleCopyLocation}
             className={`absolute bottom-3 left-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${copied ? 'bg-emerald-500 text-white scale-110' : 'bg-white text-slate-700 hover:scale-110 hover:shadow-xl'}`}
@@ -103,7 +103,7 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
             )}
           </button>
 
-          {/* Badge Participants harmonisé */}
+          {/* Badge Participants - Bas Droite - Taille et niveau harmonisés */}
           <div className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-black border transition-all text-[8px] ${isExceeded ? 'bg-rose-500 text-white border-rose-400' : isReached ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white text-slate-800 border-slate-100'}`}>
             {count}/{event.maxParticipants}
           </div>
