@@ -1,21 +1,21 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { EventType, GeminiEventResponse, EventLocation } from "../types";
 
-// Déclaration pour informer TypeScript que 'process.env' est injecté par le bundler
-declare var process: {
-  env: {
-    API_KEY: string;
-    [key: string]: string | undefined;
-  };
-};
-
+/**
+ * Service de génération d'événements utilisant Gemini 3 Flash.
+ * La clé API est injectée via process.env.API_KEY (configurée dans vite.config.ts)
+ */
 export const generateEventIdeas = async (
   month: string, 
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("KEY_NOT_FOUND");
+  
+  if (!apiKey || apiKey === "undefined") {
+    throw new Error("API_KEY_MISSING");
+  }
 
   const ai = new GoogleGenAI({ apiKey });
   
@@ -24,9 +24,13 @@ export const generateEventIdeas = async (
     : `Génère une idée d'événement inédite et excitante pour ${month} (${type}).`;
 
   const prompt = `${basePrompt} 
-    Détails requis : Titre accrocheur, date logique en ${month}, description immersive (140 car. max), un emoji thématique.
-    Participants max : 4.
-    Réponds exclusivement en JSON.`;
+    Détails requis en français : 
+    - Titre accrocheur (court)
+    - Date logique au format "JOUR MOIS" (ex: "14 ${month}")
+    - Description immersive (140 car. max)
+    - Un emoji thématique pertinent.
+    - Participants maximum (entre 3 et 8).
+    Réponds exclusivement en JSON valide.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -48,30 +52,34 @@ export const generateEventIdeas = async (
       },
     });
 
-    const data = JSON.parse(response.text || "{}");
+    // Utilisation de la propriété .text (pas de parenthèses)
+    const textOutput = response.text;
+    if (!textOutput) throw new Error("EMPTY_RESPONSE");
+
+    const data = JSON.parse(textOutput);
     return { 
       ...data, 
       maxParticipants: data.maxParticipants || 4, 
       isAiGenerated: true 
     };
   } catch (error: any) {
-    console.error("Erreur Gemini:", error);
-    if (error.message?.includes("API key") || error.status === 401) {
-      throw new Error("KEY_NOT_FOUND");
-    }
+    console.error("Gemini Error:", error);
     throw error;
   }
 };
 
+/**
+ * Suggère un lieu pertinent basé sur le titre.
+ */
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
-  try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return { name: "Lieu à définir" };
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === "undefined") return { name: "Lieu à définir" };
 
+  try {
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Suggère un lieu réel et approprié pour l'événement "${eventTitle}" qui a lieu en ${month}. Réponds juste le nom du lieu et la ville.`,
+      contents: `Suggère un lieu réel (et sa ville) pour l'événement "${eventTitle}" en ${month}. Réponds juste : Nom du lieu, Ville.`,
     });
 
     const locationName = response.text?.trim() || "Lieu à définir";

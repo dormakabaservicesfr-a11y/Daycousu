@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants';
-import { EventType, EventData } from './types';
-import { generateEventIdeas, suggestLocation } from './services/geminiService';
-import EventBubble from './components/EventBubble';
-import RegistrationModal from './components/RegistrationModal';
 
+import React, { useState, useEffect } from 'react';
+import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants.tsx';
+import { EventType, EventData } from './types.ts';
+import { generateEventIdeas, suggestLocation } from './services/geminiService.ts';
+import EventBubble from './components/EventBubble.tsx';
+import RegistrationModal from './components/RegistrationModal.tsx';
+
+// Gun est chargé via index.html
 declare var Gun: any;
 
 const App: React.FC = () => {
@@ -15,25 +17,29 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
-  const [errorInfo, setErrorInfo] = useState<{message: string, isKeyError: boolean} | null>(null);
 
   useEffect(() => {
-    // Initialisation de la base de données décentralisée
+    // Initialisation de Gun avec des relais publics stables
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
-    const node = gun.get('day_app_final_stable_v1'); 
+    const node = gun.get('day_app_prod_v2_stable'); 
     setGunNode(node);
 
+    // Écoute des données
     node.map().on((data: any, id: string) => {
       setEvents(current => {
         if (!data) return current.filter(e => e.id !== id);
         try {
+          const attendees = typeof data.attendees === 'string' ? JSON.parse(data.attendees) : (data.attendees || []);
+          const location = typeof data.location === 'string' ? JSON.parse(data.location) : (data.location || { name: "Lieu à définir" });
+          
           const formattedEvent: EventData = {
             ...data,
             id,
-            attendees: typeof data.attendees === 'string' ? JSON.parse(data.attendees) : (data.attendees || []),
-            location: typeof data.location === 'string' ? JSON.parse(data.location) : (data.location || { name: "Lieu à définir" }),
+            attendees,
+            location,
             isAiGenerated: data.isAiGenerated === 'true' || data.isAiGenerated === true
           };
+          
           const exists = current.find(e => e.id === id);
           if (exists && JSON.stringify(exists) === JSON.stringify(formattedEvent)) return current;
           return exists ? current.map(e => e.id === id ? formattedEvent : e) : [...current, formattedEvent];
@@ -47,13 +53,18 @@ const App: React.FC = () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
     
     setLoading(true);
-    setErrorInfo(null);
     
     try {
+      // 1. Génération de l'idée
       const idea = await generateEventIdeas(selectedMonth, selectedType, inputName);
+      
+      // 2. Suggestion du lieu
       const location = await suggestLocation(idea.title, selectedMonth);
+      
+      // 3. ID unique
       const id = Math.random().toString(36).substr(2, 9);
       
+      // 4. Sauvegarde Gun
       gunNode.get(id).put({
         ...idea,
         type: selectedType,
@@ -62,14 +73,16 @@ const App: React.FC = () => {
         location: JSON.stringify(location),
         isAiGenerated: 'true'
       });
+
+      // Reset
       setInputName('');
       setSelectedType('');
     } catch (err: any) {
-      console.error(err);
-      if (err.message === "KEY_NOT_FOUND") {
-        setErrorInfo({ message: "La clé API Gemini est absente ou invalide dans Vercel.", isKeyError: true });
+      console.error("Erreur de création:", err);
+      if (err.message === "API_KEY_MISSING") {
+        alert("La clé API Gemini (API_KEY) n'est pas configurée dans les variables d'environnement Vercel.");
       } else {
-        setErrorInfo({ message: "Une erreur est survenue lors de la génération.", isKeyError: false });
+        alert("Oups ! Une erreur est survenue lors de la création de l'événement. Vérifiez votre clé API.");
       }
     } finally {
       setLoading(false);
@@ -118,21 +131,15 @@ const App: React.FC = () => {
         
         <p className="text-slate-400 mt-6 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">L'organisation cousue main</p>
 
-        {errorInfo && (
-          <div className="max-w-xl w-full mb-8 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left shadow-lg">
-            <p className="text-xs font-bold text-amber-800">{errorInfo.message}</p>
-          </div>
-        )}
-
         <div className="max-w-5xl w-full mx-auto">
           <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Événement</label>
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Sujet (Optionnel)</label>
               <input 
                 type="text" 
                 value={inputName} 
                 onChange={(e) => setInputName(e.target.value)} 
-                placeholder="Ex: Soirée jeux, Brunch..." 
+                placeholder="Ex: Soirée jeux, Pique-nique..." 
                 className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm placeholder:text-slate-300" 
               />
             </div>
@@ -199,24 +206,26 @@ const App: React.FC = () => {
           canEdit={true} 
           onClose={() => setActiveEvent(null)} 
           onRegister={(name) => {
-            const updated = [...(activeEvent.attendees || []), name];
-            gunNode.get(activeEvent.id).get('attendees').put(JSON.stringify(updated));
+            const current = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
+            const updated = [...current, name];
+            gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
             setActiveEvent({ ...activeEvent, attendees: updated });
           }} 
           onUnregister={(index) => {
-            const updated = [...(activeEvent.attendees || [])];
+            const current = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
+            const updated = [...current];
             updated.splice(index, 1);
-            gunNode.get(activeEvent.id).get('attendees').put(JSON.stringify(updated));
+            gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
             setActiveEvent({ ...activeEvent, attendees: updated });
           }}
           onUpdateLocation={(loc) => { 
             const updated = { name: loc, mapsUri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}` }; 
-            gunNode.get(activeEvent.id).get('location').put(JSON.stringify(updated)); 
+            gunNode.get(activeEvent.id).put({ location: JSON.stringify(updated) }); 
             setActiveEvent({...activeEvent, location: updated}); 
           }}
-          onUpdateDate={(val) => { gunNode.get(activeEvent.id).get('date').put(val); setActiveEvent({...activeEvent, date: val}); }}
-          onUpdateDescription={(val) => { gunNode.get(activeEvent.id).get('description').put(val); setActiveEvent({...activeEvent, description: val}); }}
-          onUpdateMaxParticipants={(val) => { gunNode.get(activeEvent.id).get('maxParticipants').put(val); setActiveEvent({...activeEvent, maxParticipants: val}); }}
+          onUpdateDate={(val) => { gunNode.get(activeEvent.id).put({ date: val }); setActiveEvent({...activeEvent, date: val}); }}
+          onUpdateDescription={(val) => { gunNode.get(activeEvent.id).put({ description: val }); setActiveEvent({...activeEvent, description: val}); }}
+          onUpdateMaxParticipants={(val) => { gunNode.get(activeEvent.id).put({ maxParticipants: val }); setActiveEvent({...activeEvent, maxParticipants: val}); }}
         />
       )}
     </div>
