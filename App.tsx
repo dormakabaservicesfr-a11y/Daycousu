@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants.tsx';
-import { EventType, EventData } from './types.ts';
+import { EventType, EventData, GeminiEventResponse } from './types.ts';
 import { generateEventIdeas, suggestLocation } from './services/geminiService.ts';
 import EventBubble from './components/EventBubble.tsx';
 import RegistrationModal from './components/RegistrationModal.tsx';
@@ -40,9 +40,6 @@ const MonthSection: React.FC<{
       setActiveIndex(bestIndex);
     }
   }, [events.length, month]);
-
-  const nextEvent = () => setActiveIndex((prev) => (prev + 1) % events.length);
-  const prevEvent = () => setActiveIndex((prev) => (prev - 1 + events.length) % events.length);
 
   const theme = MONTH_THEMES[month];
 
@@ -87,194 +84,197 @@ const MonthSection: React.FC<{
 
             {events.length > 1 && (
               <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-2 z-50 pointer-events-none">
-                <button onClick={(e) => { e.stopPropagation(); prevEvent(); }} className="w-10 h-10 rounded-full bg-white/40 backdrop-blur-md border border-white/40 flex items-center justify-center text-slate-600 hover:bg-white/60 hover:text-emerald-600 transition-all pointer-events-auto shadow-sm active:scale-90">
+                <button onClick={() => setActiveIndex((p) => (p - 1 + events.length) % events.length)} className="w-10 h-10 rounded-full bg-white/40 backdrop-blur-md border border-white/40 flex items-center justify-center text-slate-600 hover:bg-white/60 pointer-events-auto shadow-sm active:scale-90">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); nextEvent(); }} className="w-10 h-10 rounded-full bg-white/40 backdrop-blur-md border border-white/40 flex items-center justify-center text-slate-600 hover:bg-white/60 hover:text-emerald-600 transition-all pointer-events-auto shadow-sm active:scale-90">
+                <button onClick={() => setActiveIndex((p) => (p + 1) % events.length)} className="w-10 h-10 rounded-full bg-white/40 backdrop-blur-md border border-white/40 flex items-center justify-center text-slate-600 hover:bg-white/60 pointer-events-auto shadow-sm active:scale-90">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                 </button>
               </div>
             )}
           </>
         ) : (
-          <div className="text-slate-300 text-[10px] font-bold uppercase tracking-widest opacity-40">Aucun événement</div>
+          <div className="text-slate-300 text-[10px] font-bold uppercase tracking-widest opacity-40 italic">Aucun événement</div>
         )}
       </div>
     </section>
   );
 };
 
+// Main App component
 const App: React.FC = () => {
   const [events, setEvents] = useState<EventData[]>([]);
-  const [inputName, setInputName] = useState<string>('');
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [inputName, setInputName] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedType, setSelectedType] = useState<EventType | ''>('');
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
 
   useEffect(() => {
-    // Initialisation de Gun.js
+    // Persistent initialisation via Gun (decentralized DB)
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
-    const node = gun.get('day_app_v2_stable_prod'); 
+    const node = gun.get('day_app_v3_prod_final'); 
     setGunNode(node);
 
+    // Listen for data changes
     node.map().on((data: any, id: string) => {
-      setEvents(current => {
-        if (!data) return current.filter(e => e.id !== id);
-        try {
-          const formattedEvent: EventData = {
-            ...data,
-            id,
-            attendees: typeof data.attendees === 'string' ? JSON.parse(data.attendees) : (data.attendees || []),
-            location: typeof data.location === 'string' ? JSON.parse(data.location) : (data.location || { name: "Lieu à définir" }),
-            isAiGenerated: data.isAiGenerated === 'true' || data.isAiGenerated === true
-          };
-          const exists = current.find(e => e.id === id);
-          if (exists && JSON.stringify(exists) === JSON.stringify(formattedEvent)) return current;
-          return exists ? current.map(e => e.id === id ? formattedEvent : e) : [...current, formattedEvent];
-        } catch (e) { return current; }
-      });
+      if (data) {
+        setEvents(current => {
+          const filtered = current.filter(e => e.id !== id);
+          const attendees = data.attendees ? JSON.parse(data.attendees) : [];
+          const location = data.location ? JSON.parse(data.location) : undefined;
+          return [...filtered, { ...data, id, attendees, location }].sort((a, b) => {
+            const m1 = MONTHS.indexOf(a.month);
+            const m2 = MONTHS.indexOf(b.month);
+            if (m1 !== m2) return m1 - m2;
+            const d1 = parseInt(a.date.match(/\d+/)?.[0] || '0');
+            const d2 = parseInt(b.date.match(/\d+/)?.[0] || '0');
+            return d1 - d2;
+          });
+        });
+      } else {
+        setEvents(current => current.filter(e => e.id !== id));
+      }
     });
-    return () => node.off();
   }, []);
 
-  const handleAddEvent = async () => {
+  // AI-powered event generation
+  const handleCreate = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
     setLoading(true);
-    
     try {
-      // Étape 1: Génération de l'idée
-      const idea = await generateEventIdeas(selectedMonth, selectedType, inputName);
+      const response: GeminiEventResponse = await generateEventIdeas(selectedMonth, selectedType as EventType, inputName);
+      const location = await suggestLocation(response.title, selectedMonth);
       
-      // Étape 2: Suggestion du lieu
-      const location = await suggestLocation(idea.title, selectedMonth);
-      
-      // Étape 3: Sauvegarde
-      const id = Math.random().toString(36).substr(2, 9);
-      gunNode.get(id).put({
-        ...idea,
+      const eventId = Math.random().toString(36).substring(7);
+      const newEvent = {
+        title: response.title,
+        date: response.date,
+        description: response.description,
+        icon: response.icon,
         type: selectedType,
         month: selectedMonth,
+        maxParticipants: response.maxParticipants,
         attendees: JSON.stringify([]),
         location: JSON.stringify(location),
-        isAiGenerated: 'true'
-      });
+        isAiGenerated: true
+      };
 
+      gunNode.get(eventId).put(newEvent);
       setInputName('');
       setSelectedType('');
-    } catch (err: any) {
-      console.error("DEBUG ERROR:", err);
-      const errorMsg = err.message || JSON.stringify(err);
-      
-      // Message d'aide ultra-spécifique pour Vercel
-      if (errorMsg.includes("API key") || errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("undefined")) {
-        alert(`ERREUR CLÉ API :\n\nL'application n'arrive pas à lire votre clé Gemini.\n\nAssurez-vous d'avoir ajouté 'API_KEY' dans les variables d'environnement de Vercel.\n\nErreur technique : ${errorMsg}`);
-      } else {
-        alert(`ERREUR TECHNIQUE :\n\n${errorMsg}\n\nVérifiez votre console de navigateur pour plus de détails.`);
-      }
+    } catch (e) {
+      console.error("Creation error:", e);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen px-4 py-12 md:py-20 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
-      <header className="w-full text-center mb-16 flex flex-col items-center">
-        <div className="relative mb-6 flex flex-col items-center select-none cursor-default group overflow-visible">
-          <h1 className="text-7xl md:text-8xl lg:text-9xl font-black italic relative z-20">
-            <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-800 via-emerald-600 to-teal-500 drop-shadow-sm inline-block px-14 pb-8">
-              Day
-            </span>
-          </h1>
-        </div>
-        
-        <p className="text-slate-400 mt-2 mb-12 font-bold tracking-[0.4em] uppercase text-[11px] opacity-70 flex items-center gap-2">
-          Votre évènement cousu main <span className="text-emerald-500 animate-pulse">🪡</span>
-        </p>
+  // Delete an event
+  const handleDelete = (id: string) => {
+    if (gunNode) gunNode.get(id).put(null);
+  };
 
-        <div className="max-w-5xl w-full mx-auto p-12 pt-0">
-          <div className="bg-white/30 backdrop-blur-lg p-2 md:p-3 rounded-[2.5rem] flex flex-col md:flex-row gap-0 items-stretch border border-white/40 shadow-[0_0_70px_-5px_rgba(16,185,129,0.15)] hover:shadow-[0_0_90px_-5px_rgba(16,185,129,0.25)] transition-all duration-700 ease-out">
-            <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/30 rounded-l-[2rem] transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Sujet (Optionnel)</label>
-              <input 
-                type="text" 
-                value={inputName} 
-                onChange={(e) => setInputName(e.target.value)} 
-                placeholder="Ex: Pique-nique, Mariage..." 
-                className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm placeholder:text-slate-400/40" 
-              />
-            </div>
-            <div className="h-10 w-[1px] bg-emerald-200 self-center hidden md:block opacity-30"></div>
-            <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/30 transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Mois</label>
-              <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer">
-                <option value="" disabled>Choisir</option>
-                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="h-10 w-[1px] bg-emerald-200 self-center hidden md:block opacity-30"></div>
-            <div className="flex-1 flex flex-col justify-center px-6 py-2 group focus-within:bg-white/30 transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Type</label>
-              <select value={selectedType} onChange={(e) => setSelectedType(e.target.value as EventType)} className="bg-transparent w-full outline-none font-bold text-slate-600 text-sm appearance-none cursor-pointer">
-                <option value="" disabled>Choisir</option>
-                {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <button 
-              onClick={handleAddEvent} 
-              disabled={loading || !selectedMonth || !selectedType} 
-              className={`m-1 px-10 py-4 rounded-[2rem] font-black text-white shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 ${loading || !selectedMonth || !selectedType ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-br from-emerald-500 to-teal-600 hover:shadow-emerald-200/50 hover:-translate-y-0.5'}`}
+  // Update an event (e.g. registrations)
+  const handleUpdate = (id: string, updates: Partial<EventData>) => {
+    if (!gunNode) return;
+    const gunUpdates: any = { ...updates };
+    if (updates.attendees) gunUpdates.attendees = JSON.stringify(updates.attendees);
+    if (updates.location) gunUpdates.location = JSON.stringify(updates.location);
+    gunNode.get(id).put(gunUpdates);
+    
+    if (activeEvent && activeEvent.id === id) {
+      setActiveEvent(prev => prev ? { ...prev, ...updates } : null);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-['Plus_Jakarta_Sans'] pb-20">
+      <header className="max-w-6xl mx-auto pt-16 pb-12 px-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div>
+            <h1 className="text-6xl font-black text-slate-900 tracking-tighter mb-2">
+              DAY<span className="text-indigo-600">.</span>
+            </h1>
+            <p className="text-slate-400 font-medium uppercase tracking-[0.2em] text-[10px]">L'organisateur d'événements propulsé par l'IA</p>
+          </div>
+          
+          <div className="bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-wrap gap-4 items-center max-w-2xl">
+            <select 
+              value={selectedMonth} 
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="px-4 py-2 bg-slate-50 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 border-none"
             >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <span className="tracking-[0.2em] text-[11px]">CRÉER</span>
-              )}
+              <option value="">Mois</option>
+              {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            
+            <select 
+              value={selectedType} 
+              onChange={(e) => setSelectedType(e.target.value as EventType)}
+              className="px-4 py-2 bg-slate-50 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 border-none"
+            >
+              <option value="">Type</option>
+              {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+
+            <input 
+              type="text"
+              value={inputName}
+              onChange={(e) => setInputName(e.target.value)}
+              placeholder="Nom (optionnel)"
+              className="px-4 py-2 bg-slate-50 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 border-none flex-1 min-w-[150px]"
+            />
+
+            <button 
+              onClick={handleCreate}
+              disabled={loading || !selectedMonth || !selectedType}
+              className={`
+                px-6 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all
+                ${loading ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 shadow-lg shadow-indigo-200'}
+              `}
+            >
+              {loading ? '...' : 'Générer'}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        {MONTHS.map((month) => (
+      <main className="max-w-6xl mx-auto px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {MONTHS.map(month => (
           <MonthSection 
             key={month} 
             month={month} 
             events={events.filter(e => e.month === month)}
-            onEventClick={(e) => setActiveEvent(e)}
-            onDelete={(id) => gunNode.get(id).put(null)}
+            onEventClick={setActiveEvent}
+            onDelete={handleDelete}
           />
         ))}
       </main>
 
       {activeEvent && (
         <RegistrationModal 
-          event={activeEvent} 
-          canEdit={true} 
-          onClose={() => setActiveEvent(null)} 
+          event={activeEvent}
+          canEdit={true}
+          onClose={() => setActiveEvent(null)}
           onRegister={(name) => {
-            const current = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
-            const updated = [...current, name];
-            gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
-          }} 
-          onUnregister={(index) => {
-            const current = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
-            const updated = [...current];
-            updated.splice(index, 1);
-            gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
+            const attendees = [...activeEvent.attendees, name];
+            handleUpdate(activeEvent.id, { attendees });
           }}
-          onUpdateLocation={(loc) => { 
-            const updated = { name: loc, mapsUri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}` }; 
-            gunNode.get(activeEvent.id).put({ location: JSON.stringify(updated) }); 
+          onUnregister={(idx) => {
+            const attendees = activeEvent.attendees.filter((_, i) => i !== idx);
+            handleUpdate(activeEvent.id, { attendees });
           }}
-          onUpdateDate={(val) => gunNode.get(activeEvent.id).put({ date: val })}
-          onUpdateDescription={(val) => gunNode.get(activeEvent.id).put({ description: val })}
-          onUpdateMaxParticipants={(val) => gunNode.get(activeEvent.id).put({ maxParticipants: val })}
+          onUpdateLocation={(name) => handleUpdate(activeEvent.id, { location: { ...activeEvent.location, name } })}
+          onUpdateDate={(date) => handleUpdate(activeEvent.id, { date })}
+          onUpdateDescription={(description) => handleUpdate(activeEvent.id, { description })}
+          onUpdateMaxParticipants={(max) => handleUpdate(activeEvent.id, { maxParticipants: max })}
         />
       )}
     </div>
   );
 };
 
+// Fix: Adding missing default export for App
 export default App;
