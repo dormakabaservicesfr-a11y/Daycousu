@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { EventData } from '../types';
-import { TYPE_COLORS } from '../constants';
+import { TYPE_COLORS, MONTHS } from '../constants';
 
 interface EventBubbleProps {
   event: EventData;
@@ -21,9 +21,33 @@ const EventBubble: React.FC<EventBubbleProps> = ({
   const [copied, setCopied] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   
+  // Détection si l'événement est passé de plus de 1 jour
+  const isExpired = useMemo(() => {
+    try {
+      const now = new Date();
+      const [dayStr, monthStr] = event.date.split(' ');
+      const day = parseInt(dayStr);
+      const monthIndex = MONTHS.indexOf(monthStr);
+
+      if (monthIndex === -1 || isNaN(day)) return false;
+
+      // Création d'une date pour l'année en cours
+      const eventDate = new Date(now.getFullYear(), monthIndex, day);
+      
+      // Seuil : 24 heures après le début de la journée de l'événement
+      const threshold = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000);
+      
+      return now > threshold;
+    } catch (e) {
+      return false;
+    }
+  }, [event.date]);
+
   const colorClass = isConfirmingDelete 
     ? 'bg-red-500 text-white shadow-red-200/50' 
-    : TYPE_COLORS[event.type];
+    : isExpired 
+      ? 'bg-slate-400 text-slate-100 shadow-slate-200/30' 
+      : TYPE_COLORS[event.type];
     
   const count = event.attendees.length;
   const isReached = count === event.maxParticipants;
@@ -50,11 +74,12 @@ const EventBubble: React.FC<EventBubbleProps> = ({
       className={`
         relative w-40 h-40 rounded-full flex flex-col items-center justify-center p-4 
         cursor-pointer transition-all duration-500
-        ${!isBackground ? 'animate-float shadow-lg hover:shadow-xl hover:scale-105' : 'shadow-md grayscale-[0.2]'}
+        ${!isBackground && !isExpired ? 'animate-float shadow-lg hover:shadow-xl hover:scale-105' : 'shadow-md'}
         ${colorClass}
-        ${!isConfirmingDelete && isReached && !isBackground ? 'ring-4 ring-emerald-500/30' : ''}
-        ${!isConfirmingDelete && isExceeded && !isBackground ? 'ring-4 ring-rose-500/30' : ''}
+        ${!isConfirmingDelete && isReached && !isBackground && !isExpired ? 'ring-4 ring-emerald-500/30' : ''}
+        ${!isConfirmingDelete && isExceeded && !isBackground && !isExpired ? 'ring-4 ring-rose-500/30' : ''}
         ${isBackground ? 'opacity-40 pointer-events-none' : 'opacity-100'}
+        ${isExpired ? 'grayscale-[0.5] grayscale hover:grayscale-0 transition-[filter]' : ''}
       `}
     >
       {isConfirmingDelete ? (
@@ -78,11 +103,13 @@ const EventBubble: React.FC<EventBubbleProps> = ({
       ) : (
         <>
           <div className={`flex flex-col items-center transition-all duration-500 ${isBackground ? 'scale-90' : '-translate-y-4'}`}>
-            {!isBackground && <span className="text-3xl mb-1">{event.icon}</span>}
+            {!isBackground && <span className={`text-3xl mb-1 ${isExpired ? 'opacity-50' : ''}`}>{event.icon}</span>}
             <h3 className="font-bold text-[11px] leading-tight mb-0.5 line-clamp-2 uppercase tracking-wide px-2 text-center">
               {event.title}
             </h3>
-            <p className="text-[9px] font-bold opacity-80">{event.date}</p>
+            <p className={`text-[9px] font-bold ${isExpired ? 'opacity-50' : 'opacity-80'}`}>
+              {event.date} {isExpired && ' (Passé)'}
+            </p>
           </div>
           
           {canEdit && !isBackground && (
@@ -109,17 +136,21 @@ const EventBubble: React.FC<EventBubbleProps> = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 ) : (
-                  <svg viewBox="0 0 48 48" className="h-6 w-6" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="#4285F4" d="M24 4c-7.73 0-14 6.27-14 14 0 10.5 14 26 14 26s14-15.5 14-26c0-7.73-6.27-14-14-14zm0 19c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-                    <path fill="#34A853" d="M24 14c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"/>
-                    <path fill="#EA4335" d="M24 4c-7.73 0-14 6.27-14 14 0 3.1 1.01 6.13 2.87 8.65L24 42l11.13-15.35C36.99 24.13 38 21.1 38 18c0-7.73-6.27-14-14-14z"/>
-                    <path fill="#FBBC04" d="M12.87 26.65C11.01 24.13 10 21.1 10 18c0-3.37 1.19-6.46 3.16-8.86L24 22.84l-11.13 3.81z"/>
+                  <svg viewBox="0 0 48 48" className={`h-6 w-6 ${isExpired ? 'opacity-40 grayscale' : ''}`} xmlns="http://www.w3.org/2000/svg">
+                    {/* Top: Red */}
+                    <path fill="#EA4335" d="M24 4c-7.73 0-14 6.27-14 14 0 3.1 1.01 6.13 2.87 8.65L24 18V4z"/>
+                    {/* Right: Yellow */}
+                    <path fill="#FBBC04" d="M24 4v14l11.13 8.65C36.99 24.13 38 21.1 38 18c0-7.73-6.27-14-14-14z"/>
+                    {/* Bottom: Green */}
+                    <path fill="#34A853" d="M12.87 26.65L24 42l11.13-15.35L24 18l-11.13 8.65z"/>
+                    {/* Center: Blue */}
+                    <path fill="#4285F4" d="M24 14c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"/>
                   </svg>
                 )}
               </button>
 
               {/* Badge Participants */}
-              <div className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-black border transition-all text-[8px] ${isExceeded ? 'bg-rose-500 text-white border-rose-400' : isReached ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white text-slate-800 border-slate-100'}`}>
+              <div className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-black border transition-all text-[8px] ${isExpired ? 'bg-slate-300 text-slate-600 border-slate-400/20' : isExceeded ? 'bg-rose-500 text-white border-rose-400' : isReached ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white text-slate-800 border-slate-100'}`}>
                 {count}/{event.maxParticipants}
               </div>
             </>

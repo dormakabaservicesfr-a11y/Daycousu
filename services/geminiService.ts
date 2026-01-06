@@ -4,7 +4,6 @@ import { EventType, GeminiEventResponse, EventLocation } from "../types";
 
 /**
  * Service de génération d'événements utilisant Gemini 3 Flash.
- * La clé API est injectée via process.env.API_KEY (configurée dans vite.config.ts)
  */
 export const generateEventIdeas = async (
   month: string, 
@@ -29,7 +28,7 @@ export const generateEventIdeas = async (
     - Date logique au format "JOUR MOIS" (ex: "14 ${month}")
     - Description immersive (140 car. max)
     - Un emoji thématique pertinent.
-    - Participants maximum (entre 3 et 8).
+    - Participants maximum : Fixe impérativement à 4.
     Réponds exclusivement en JSON valide.`;
 
   try {
@@ -52,14 +51,14 @@ export const generateEventIdeas = async (
       },
     });
 
-    // Utilisation de la propriété .text (pas de parenthèses)
     const textOutput = response.text;
     if (!textOutput) throw new Error("EMPTY_RESPONSE");
 
     const data = JSON.parse(textOutput);
+    // On force 4 même si le modèle renvoie autre chose
     return { 
       ...data, 
-      maxParticipants: data.maxParticipants || 4, 
+      maxParticipants: 4, 
       isAiGenerated: true 
     };
   } catch (error: any) {

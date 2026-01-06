@@ -65,8 +65,10 @@ const App: React.FC = () => {
       const location = await suggestLocation(idea.title, selectedMonth);
       const id = Math.random().toString(36).substr(2, 9);
       
+      // On s'assure que maxParticipants est toujours 4
       gunNode.get(id).put({
         ...idea,
+        maxParticipants: 4,
         type: selectedType,
         month: selectedMonth,
         attendees: JSON.stringify([]),
