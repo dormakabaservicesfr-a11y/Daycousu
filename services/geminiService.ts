@@ -7,7 +7,6 @@ export const generateEventIdeas = async (
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  // Initialisation à chaque appel pour garantir la récupération de la clé à jour
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const basePrompt = userProvidedName 
@@ -23,31 +22,36 @@ export const generateEventIdeas = async (
     Participants max : 4.
     Réponds exclusivement en JSON.`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          date: { type: Type.STRING },
-          description: { type: Type.STRING },
-          icon: { type: Type.STRING },
-          maxParticipants: { type: Type.INTEGER }
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            date: { type: Type.STRING },
+            description: { type: Type.STRING },
+            icon: { type: Type.STRING },
+            maxParticipants: { type: Type.INTEGER }
+          },
+          required: ["title", "date", "description", "icon", "maxParticipants"],
         },
-        required: ["title", "date", "description", "icon", "maxParticipants"],
       },
-    },
-  });
+    });
 
-  const data = JSON.parse(response.text || "{}");
-  return { 
-    ...data, 
-    maxParticipants: data.maxParticipants || 4, 
-    isAiGenerated: true 
-  };
+    const data = JSON.parse(response.text || "{}");
+    return { 
+      ...data, 
+      maxParticipants: data.maxParticipants || 4, 
+      isAiGenerated: true 
+    };
+  } catch (error: any) {
+    console.error("Gemini API Error:", error);
+    throw error;
+  }
 };
 
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
@@ -55,7 +59,7 @@ export const suggestLocation = async (eventTitle: string, month: string): Promis
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Suggère un lieu réel et approprié pour l'événement "${eventTitle}" qui a lieu en ${month}. Réponds juste le nom du lieu et la ville.`,
+      contents: `Suggère un lieu réel et approprié pour l'événement "${eventTitle}" pour le mois de ${month}. Réponds uniquement par le nom du lieu et la ville.`,
     });
 
     const locationName = response.text?.trim() || "Lieu à définir";

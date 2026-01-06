@@ -121,6 +121,7 @@ const App: React.FC = () => {
   const [gunNode, setGunNode] = useState<any>(null);
 
   useEffect(() => {
+    // Initialisation de Gun avec des relais stables
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_v2_stable_prod'); 
     setGunNode(node);
@@ -152,6 +153,7 @@ const App: React.FC = () => {
       const idea = await generateEventIdeas(selectedMonth, selectedType, inputName);
       const location = await suggestLocation(idea.title, selectedMonth);
       const id = Math.random().toString(36).substr(2, 9);
+      
       gunNode.get(id).put({
         ...idea,
         type: selectedType,
@@ -160,23 +162,23 @@ const App: React.FC = () => {
         location: JSON.stringify(location),
         isAiGenerated: 'true'
       });
+
       setInputName('');
       setSelectedType('');
     } catch (err: any) {
-      console.error("Erreur détaillée:", err);
-      
+      console.error("Erreur de création:", err);
       const errorMsg = err.message || "";
-      const isAuthError = errorMsg.includes("API key") || errorMsg.includes("not found") || errorMsg.includes("401") || errorMsg.includes("403");
-
-      if (isAuthError && window.aistudio) {
-        // Dans l'environnement de preview (AI Studio)
-        alert("Clé API manquante ou invalide. Ouverture du sélecteur de clé...");
-        await window.aistudio.openSelectKey();
-      } else if (isAuthError) {
-        // Sur un déploiement Vercel standard
-        alert("Clé API Gemini non configurée.\n\nAllez dans les paramètres de votre projet Vercel et ajoutez une variable d'environnement nommée API_KEY avec votre clé gratuite.");
+      
+      // Détection intelligente de l'erreur de clé
+      if (errorMsg.includes("API key") || errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("not found")) {
+        if (window.aistudio) {
+          alert("Votre clé API n'est pas configurée. Ouverture du sélecteur...");
+          window.aistudio.openSelectKey();
+        } else {
+          alert("Erreur de Clé API : Veuillez ajouter une variable d'environnement 'API_KEY' dans vos paramètres Vercel.");
+        }
       } else {
-        alert("Une erreur inattendue est survenue lors de la génération. Veuillez réessayer.");
+        alert("Une erreur réseau est survenue. Vérifiez votre connexion internet ou la configuration de votre clé Gemini.");
       }
     } finally {
       setLoading(false);
