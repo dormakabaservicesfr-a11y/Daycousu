@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants';
 import { EventType, EventData } from './types';
 import { generateEventIdeas, suggestLocation } from './services/geminiService';
-import EventBubble from './components/EventBubble';
+import BubbleStack from './components/BubbleStack';
 import RegistrationModal from './components/RegistrationModal';
 
 // Gun est chargé via index.html
@@ -90,8 +90,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen px-4 py-12 md:py-20 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
-      {/* Le badge Live Sync a été retiré */}
-
       <header className="w-full text-center mb-16 flex flex-col items-center">
         <div className="relative mb-6">
           <h1 className="text-8xl font-black tracking-tighter flex items-center justify-center relative">
@@ -176,7 +174,7 @@ const App: React.FC = () => {
         {MONTHS.map((month) => (
           <section 
             key={month} 
-            ref={(el) => { monthRefs.current[month] = el; }}
+            ref={(el) => { if (el) monthRefs.current[month] = el; }}
             className={`group relative flex flex-col min-h-[400px] p-8 rounded-[3.5rem] border transition-all duration-700 ${MONTH_THEMES[month].bg} ${selectedMonth === month ? 'border-emerald-400 ring-4 ring-emerald-500/10 shadow-2xl scale-[1.02]' : MONTH_THEMES[month].border} hover:shadow-xl`}
           >
             <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 mb-8 ${MONTH_THEMES[month].text}`}>
@@ -184,15 +182,12 @@ const App: React.FC = () => {
               {month}
             </h2>
             <div className="flex-1 flex flex-wrap content-start justify-center gap-6 relative z-10">
-              {events.filter(e => e.month === month).map(event => (
-                <EventBubble 
-                  key={event.id} 
-                  event={event} 
-                  canEdit={true} 
-                  onClick={() => setActiveEvent(event)} 
-                  onDelete={() => gunNode.get(event.id).put(null)} 
-                />
-              ))}
+              <BubbleStack 
+                events={events.filter(e => e.month === month)}
+                canEdit={true}
+                onEventClick={(event) => setActiveEvent(event)}
+                onEventDelete={(id) => gunNode.get(id).put(null)}
+              />
             </div>
           </section>
         ))}

@@ -6,11 +6,18 @@ import { TYPE_COLORS } from '../constants';
 interface EventBubbleProps {
   event: EventData;
   canEdit: boolean;
+  isBackground?: boolean;
   onClick: () => void;
   onDelete: () => void;
 }
 
-const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDelete }) => {
+const EventBubble: React.FC<EventBubbleProps> = ({ 
+  event, 
+  canEdit, 
+  isBackground = false,
+  onClick, 
+  onDelete 
+}) => {
   const [copied, setCopied] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   
@@ -42,11 +49,12 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
       onClick={!isConfirmingDelete ? onClick : undefined}
       className={`
         relative w-40 h-40 rounded-full flex flex-col items-center justify-center p-4 
-        cursor-pointer transform transition-all duration-300 hover:scale-105 hover:-rotate-3
-        animate-float shadow-lg hover:shadow-xl text-center z-10
+        cursor-pointer transition-all duration-500
+        ${!isBackground ? 'animate-float shadow-lg hover:shadow-xl hover:scale-105' : 'shadow-md grayscale-[0.2]'}
         ${colorClass}
-        ${!isConfirmingDelete && isReached ? 'ring-4 ring-emerald-500/30' : ''}
-        ${!isConfirmingDelete && isExceeded ? 'ring-4 ring-rose-500/30' : ''}
+        ${!isConfirmingDelete && isReached && !isBackground ? 'ring-4 ring-emerald-500/30' : ''}
+        ${!isConfirmingDelete && isExceeded && !isBackground ? 'ring-4 ring-rose-500/30' : ''}
+        ${isBackground ? 'opacity-40 pointer-events-none' : 'opacity-100'}
       `}
     >
       {isConfirmingDelete ? (
@@ -69,16 +77,15 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
         </div>
       ) : (
         <>
-          {/* Contenu remonté de 10% (-translate-y-4 car 16px/160px = 10%) */}
-          <div className="flex flex-col items-center -translate-y-4">
-            <span className="text-3xl mb-1">{event.icon}</span>
-            <h3 className="font-bold text-[11px] leading-tight mb-0.5 line-clamp-2 uppercase tracking-wide px-2">
+          <div className={`flex flex-col items-center transition-all duration-500 ${isBackground ? 'scale-90' : '-translate-y-4'}`}>
+            {!isBackground && <span className="text-3xl mb-1">{event.icon}</span>}
+            <h3 className="font-bold text-[11px] leading-tight mb-0.5 line-clamp-2 uppercase tracking-wide px-2 text-center">
               {event.title}
             </h3>
             <p className="text-[9px] font-bold opacity-80">{event.date}</p>
           </div>
           
-          {canEdit && (
+          {canEdit && !isBackground && (
             <button 
               onClick={handleToggleDelete}
               className="absolute top-2 right-2 w-6 h-6 bg-red-500/80 text-white rounded-full flex items-center justify-center shadow-md transition-all hover:scale-110 active:scale-90 z-20"
@@ -89,27 +96,34 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
             </button>
           )}
 
-          {/* Bouton Google Maps (Copie) - Bas Gauche */}
-          <button 
-            onClick={handleCopyLocation}
-            className={`absolute bottom-3 left-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${copied ? 'bg-emerald-500 text-white scale-110' : 'bg-white text-slate-700 hover:scale-110 hover:shadow-xl'}`}
-            title="Copier le lieu"
-          >
-            {copied ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EA4335" />
-              </svg>
-            )}
-          </button>
+          {!isBackground && (
+            <>
+              {/* Bouton Google Maps (Copie) */}
+              <button 
+                onClick={handleCopyLocation}
+                className={`absolute bottom-3 left-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${copied ? 'bg-emerald-500 text-white scale-110' : 'bg-white text-slate-700 hover:scale-110 hover:shadow-xl border border-slate-50'}`}
+                title="Copier le lieu"
+              >
+                {copied ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 48 48" className="h-6 w-6" xmlns="http://www.w3.org/2000/svg">
+                    <path fill="#4285F4" d="M24 4c-7.73 0-14 6.27-14 14 0 10.5 14 26 14 26s14-15.5 14-26c0-7.73-6.27-14-14-14zm0 19c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+                    <path fill="#34A853" d="M24 14c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"/>
+                    <path fill="#EA4335" d="M24 4c-7.73 0-14 6.27-14 14 0 3.1 1.01 6.13 2.87 8.65L24 42l11.13-15.35C36.99 24.13 38 21.1 38 18c0-7.73-6.27-14-14-14z"/>
+                    <path fill="#FBBC04" d="M12.87 26.65C11.01 24.13 10 21.1 10 18c0-3.37 1.19-6.46 3.16-8.86L24 22.84l-11.13 3.81z"/>
+                  </svg>
+                )}
+              </button>
 
-          {/* Badge Participants - Bas Droite - Taille et niveau harmonisés */}
-          <div className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-black border transition-all text-[8px] ${isExceeded ? 'bg-rose-500 text-white border-rose-400' : isReached ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white text-slate-800 border-slate-100'}`}>
-            {count}/{event.maxParticipants}
-          </div>
+              {/* Badge Participants */}
+              <div className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-black border transition-all text-[8px] ${isExceeded ? 'bg-rose-500 text-white border-rose-400' : isReached ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white text-slate-800 border-slate-100'}`}>
+                {count}/{event.maxParticipants}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
