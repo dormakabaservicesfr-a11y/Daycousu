@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants.tsx';
-import { EventType, EventData } from './types.ts';
-import { generateEventIdeas, suggestLocation } from './services/geminiService.ts';
-import EventBubble from './components/EventBubble.tsx';
-import RegistrationModal from './components/RegistrationModal.tsx';
+import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants';
+import { EventType, EventData } from './types';
+import { generateEventIdeas, suggestLocation } from './services/geminiService';
+import EventBubble from './components/EventBubble';
+import RegistrationModal from './components/RegistrationModal';
 
 // Gun est chargé via index.html
 declare var Gun: any;
