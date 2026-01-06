@@ -7,6 +7,7 @@ export const generateEventIdeas = async (
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
+  // Utilisation directe de process.env.API_KEY sans logique de sélecteur
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const basePrompt = userProvidedName 

@@ -8,16 +8,6 @@ import RegistrationModal from './components/RegistrationModal.tsx';
 
 declare var Gun: any;
 
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
-
 const MonthSection: React.FC<{
   month: string;
   events: EventData[];
@@ -121,7 +111,6 @@ const App: React.FC = () => {
   const [gunNode, setGunNode] = useState<any>(null);
 
   useEffect(() => {
-    // Initialisation de Gun avec des relais stables
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_v2_stable_prod'); 
     setGunNode(node);
@@ -169,16 +158,11 @@ const App: React.FC = () => {
       console.error("Erreur de création:", err);
       const errorMsg = err.message || "";
       
-      // Détection intelligente de l'erreur de clé
+      // Message d'erreur spécifique pour le déploiement Vercel
       if (errorMsg.includes("API key") || errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("not found")) {
-        if (window.aistudio) {
-          alert("Votre clé API n'est pas configurée. Ouverture du sélecteur...");
-          window.aistudio.openSelectKey();
-        } else {
-          alert("Erreur de Clé API : Veuillez ajouter une variable d'environnement 'API_KEY' dans vos paramètres Vercel.");
-        }
+        alert("Configuration requise : Veuillez ajouter votre clé API Gemini dans les variables d'environnement de votre projet Vercel sous le nom 'API_KEY'.");
       } else {
-        alert("Une erreur réseau est survenue. Vérifiez votre connexion internet ou la configuration de votre clé Gemini.");
+        alert("Oups ! Une erreur est survenue lors de la génération de l'idée. Vérifiez votre connexion.");
       }
     } finally {
       setLoading(false);
@@ -197,7 +181,7 @@ const App: React.FC = () => {
         </div>
         
         <p className="text-slate-400 mt-2 mb-12 font-bold tracking-[0.4em] uppercase text-[11px] opacity-70">
-          Votre évènement cousu main
+          Votre évènement cousu main 🪡
         </p>
 
         <div className="max-w-5xl w-full mx-auto p-12 pt-0">
