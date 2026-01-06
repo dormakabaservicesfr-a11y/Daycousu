@@ -14,7 +14,6 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
   const [copied, setCopied] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   
-  // Si on confirme la suppression, on force un rouge vif, sinon on utilise la couleur du type
   const colorClass = isConfirmingDelete 
     ? 'bg-red-500 text-white shadow-red-200/50' 
     : TYPE_COLORS[event.type];
@@ -50,13 +49,6 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
         ${!isConfirmingDelete && isExceeded ? 'ring-4 ring-rose-500/30' : ''}
       `}
     >
-      {/* Badge IA */}
-      {event.isAiGenerated && !isConfirmingDelete && (
-        <div className="absolute -top-1 -left-1 bg-white/90 text-[8px] font-black text-indigo-600 px-2 py-0.5 rounded-full shadow-sm border border-indigo-100 flex items-center gap-0.5 animate-pulse">
-          <span>✨</span> AI
-        </div>
-      )}
-
       {isConfirmingDelete ? (
         <div className="flex flex-col items-center justify-center space-y-2 w-full animate-in fade-in zoom-in duration-200">
           <p className="text-[10px] font-black uppercase tracking-widest text-white drop-shadow-sm">Supprimer ?</p>
@@ -94,9 +86,10 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
             </button>
           )}
 
+          {/* Bouton Google Maps (Copie) */}
           <button 
             onClick={handleCopyLocation}
-            className={`absolute bottom-2 left-2 w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all ${copied ? 'bg-emerald-500 text-white scale-110' : 'bg-white text-slate-700 hover:scale-110 hover:shadow-xl'}`}
+            className={`absolute bottom-3 left-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${copied ? 'bg-emerald-500 text-white scale-110' : 'bg-white text-slate-700 hover:scale-110 hover:shadow-xl'}`}
             title="Copier le lieu"
           >
             {copied ? (
@@ -105,20 +98,13 @@ const EventBubble: React.FC<EventBubbleProps> = ({ event, canEdit, onClick, onDe
               </svg>
             ) : (
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="9" stroke="url(#compassGradient)" strokeWidth="1.5"/>
-                <path d="M12 6L14 12L12 18L10 12L12 6Z" fill="url(#compassGradient)" />
-                <circle cx="12" cy="12" r="1.5" fill="white" />
-                <defs>
-                  <linearGradient id="compassGradient" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#2DD4BF" />
-                    <stop offset="1" stopColor="#6366F1" />
-                  </linearGradient>
-                </defs>
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EA4335" />
               </svg>
             )}
           </button>
 
-          <div className={`absolute -bottom-1 -right-4 text-[7px] px-3 py-1.5 rounded-full flex items-center justify-center shadow-md font-black border transition-all ${isExceeded ? 'bg-rose-500 text-white' : isReached ? 'bg-emerald-500 text-white' : 'bg-white text-slate-800'}`}>
+          {/* Badge Participants harmonisé */}
+          <div className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-black border transition-all text-[8px] ${isExceeded ? 'bg-rose-500 text-white border-rose-400' : isReached ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white text-slate-800 border-slate-100'}`}>
             {count}/{event.maxParticipants}
           </div>
         </>

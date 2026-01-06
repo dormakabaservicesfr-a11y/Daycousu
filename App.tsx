@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants';
 import { EventType, EventData } from './types';
 import { generateEventIdeas, suggestLocation } from './services/geminiService';
@@ -18,13 +18,14 @@ const App: React.FC = () => {
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
 
+  // Références pour le défilement vers les mois
+  const monthRefs = useRef<{ [key: string]: HTMLElement | null }>({});
+
   useEffect(() => {
-    // Initialisation de Gun avec des relais publics stables
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_prod_v2_stable'); 
     setGunNode(node);
 
-    // Écoute des données
     node.map().on((data: any, id: string) => {
       setEvents(current => {
         if (!data) return current.filter(e => e.id !== id);
@@ -49,22 +50,21 @@ const App: React.FC = () => {
     return () => node.off();
   }, []);
 
+  // Déclenche le défilement quand le mois change via le select
+  useEffect(() => {
+    if (selectedMonth && monthRefs.current[selectedMonth]) {
+      monthRefs.current[selectedMonth]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedMonth]);
+
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
-    
     setLoading(true);
-    
     try {
-      // 1. Génération de l'idée
       const idea = await generateEventIdeas(selectedMonth, selectedType, inputName);
-      
-      // 2. Suggestion du lieu
       const location = await suggestLocation(idea.title, selectedMonth);
-      
-      // 3. ID unique
       const id = Math.random().toString(36).substr(2, 9);
       
-      // 4. Sauvegarde Gun
       gunNode.get(id).put({
         ...idea,
         type: selectedType,
@@ -74,15 +74,14 @@ const App: React.FC = () => {
         isAiGenerated: 'true'
       });
 
-      // Reset
       setInputName('');
       setSelectedType('');
     } catch (err: any) {
       console.error("Erreur de création:", err);
       if (err.message === "API_KEY_MISSING") {
-        alert("La clé API Gemini (API_KEY) n'est pas configurée dans les variables d'environnement Vercel.");
+        alert("La clé API Gemini (API_KEY) n'est pas configurée dans les variables d'environnement.");
       } else {
-        alert("Oups ! Une erreur est survenue lors de la création de l'événement. Vérifiez votre clé API.");
+        alert("Oups ! Erreur lors de la création de l'événement.");
       }
     } finally {
       setLoading(false);
@@ -118,10 +117,10 @@ const App: React.FC = () => {
                       <stop offset="0%" stopColor="#10b981" />
                       <stop offset="100%" stopColor="#0d9488" />
                     </linearGradient>
-                    <radialGradient id="thimbleOverlay" cx="50%" cy="40%" r="60%">
+                    <linearGradient id="thimbleOverlay" x1="50%" y1="0%" x2="50%" y2="100%">
                       <stop offset="0%" stopColor="white" stopOpacity="0.2" />
                       <stop offset="100%" stopColor="black" stopOpacity="0.1" />
-                    </radialGradient>
+                    </linearGradient>
                   </defs>
                 </svg>
               </div>
@@ -180,7 +179,11 @@ const App: React.FC = () => {
 
       <main className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {MONTHS.map((month) => (
-          <section key={month} className={`group relative flex flex-col min-h-[400px] p-8 rounded-[3.5rem] border transition-all ${MONTH_THEMES[month].bg} ${MONTH_THEMES[month].border} hover:shadow-xl`}>
+          <section 
+            key={month} 
+            ref={el => monthRefs.current[month] = el}
+            className={`group relative flex flex-col min-h-[400px] p-8 rounded-[3.5rem] border transition-all duration-700 ${MONTH_THEMES[month].bg} ${selectedMonth === month ? 'border-emerald-400 ring-4 ring-emerald-500/10 shadow-2xl scale-[1.02]' : MONTH_THEMES[month].border} hover:shadow-xl`}
+          >
             <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 mb-8 ${MONTH_THEMES[month].text}`}>
               <span className={`w-2 h-8 rounded-full ${MONTH_THEMES[month].accent}`}></span>
               {month}
