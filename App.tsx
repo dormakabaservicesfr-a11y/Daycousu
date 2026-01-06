@@ -6,7 +6,7 @@ import { generateEventIdeas, suggestLocation } from './services/geminiService.ts
 import EventBubble from './components/EventBubble.tsx';
 import RegistrationModal from './components/RegistrationModal.tsx';
 
-// Gun est importé via script tag dans index.html
+// Gun est chargé globalement via le script dans index.html
 declare var Gun: any;
 
 const MonthSection: React.FC<{
@@ -114,7 +114,7 @@ const App: React.FC = () => {
   const [gunNode, setGunNode] = useState<any>(null);
 
   useEffect(() => {
-    // Initialisation de Gun avec des relais persistants
+    // Initialisation de Gun.js
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_v2_stable_prod'); 
     setGunNode(node);
@@ -142,13 +142,16 @@ const App: React.FC = () => {
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
     setLoading(true);
+    
     try {
-      // Appel au service Gemini
+      // Étape 1: Génération de l'idée
       const idea = await generateEventIdeas(selectedMonth, selectedType, inputName);
-      const location = await suggestLocation(idea.title, selectedMonth);
-      const id = Math.random().toString(36).substr(2, 9);
       
-      // Sauvegarde dans Gun.js
+      // Étape 2: Suggestion du lieu
+      const location = await suggestLocation(idea.title, selectedMonth);
+      
+      // Étape 3: Sauvegarde
+      const id = Math.random().toString(36).substr(2, 9);
       gunNode.get(id).put({
         ...idea,
         type: selectedType,
@@ -158,20 +161,17 @@ const App: React.FC = () => {
         isAiGenerated: 'true'
       });
 
-      // Reset formulaire
       setInputName('');
       setSelectedType('');
-      // Notification succès via console
-      console.log("Événement créé avec succès !");
     } catch (err: any) {
-      console.error("Erreur de création:", err);
-      const errorMsg = err.message || "";
+      console.error("DEBUG ERROR:", err);
+      const errorMsg = err.message || JSON.stringify(err);
       
-      // Détection spécifique pour Vercel
-      if (errorMsg.includes("API key") || errorMsg.includes("401") || errorMsg.includes("403")) {
-        alert("Action requise : Votre clé API Gemini n'est pas configurée.\n\nAllez dans les paramètres de votre projet Vercel > Environment Variables et ajoutez la clé 'API_KEY' avec votre token Gemini gratuit.");
+      // Message d'aide ultra-spécifique pour Vercel
+      if (errorMsg.includes("API key") || errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("undefined")) {
+        alert(`ERREUR CLÉ API :\n\nL'application n'arrive pas à lire votre clé Gemini.\n\nAssurez-vous d'avoir ajouté 'API_KEY' dans les variables d'environnement de Vercel.\n\nErreur technique : ${errorMsg}`);
       } else {
-        alert("Oups ! Une erreur réseau est survenue. Vérifiez votre connexion internet.");
+        alert(`ERREUR TECHNIQUE :\n\n${errorMsg}\n\nVérifiez votre console de navigateur pour plus de détails.`);
       }
     } finally {
       setLoading(false);
@@ -196,12 +196,12 @@ const App: React.FC = () => {
         <div className="max-w-5xl w-full mx-auto p-12 pt-0">
           <div className="bg-white/30 backdrop-blur-lg p-2 md:p-3 rounded-[2.5rem] flex flex-col md:flex-row gap-0 items-stretch border border-white/40 shadow-[0_0_70px_-5px_rgba(16,185,129,0.15)] hover:shadow-[0_0_90px_-5px_rgba(16,185,129,0.25)] transition-all duration-700 ease-out">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/30 rounded-l-[2rem] transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Thématique (Optionnel)</label>
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Sujet (Optionnel)</label>
               <input 
                 type="text" 
                 value={inputName} 
                 onChange={(e) => setInputName(e.target.value)} 
-                placeholder="Ex: Soirée jeux, Brunch chic..." 
+                placeholder="Ex: Pique-nique, Mariage..." 
                 className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm placeholder:text-slate-400/40" 
               />
             </div>
@@ -254,13 +254,13 @@ const App: React.FC = () => {
           canEdit={true} 
           onClose={() => setActiveEvent(null)} 
           onRegister={(name) => {
-            const currentAttendees = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
-            const updated = [...currentAttendees, name];
+            const current = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
+            const updated = [...current, name];
             gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
           }} 
           onUnregister={(index) => {
-            const currentAttendees = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
-            const updated = [...currentAttendees];
+            const current = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
+            const updated = [...current];
             updated.splice(index, 1);
             gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
           }}
