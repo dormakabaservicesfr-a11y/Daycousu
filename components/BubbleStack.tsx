@@ -69,19 +69,18 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
     setActiveIndex((prev) => (prev - 1 + sortedEvents.length) % sortedEvents.length);
   };
 
-  // Si seulement 1 événement, on l'affiche normalement
+  // Si seulement 1 événement, on l'affiche centré dans le même conteneur de hauteur fixe que la pile
   if (sortedEvents.length < 2) {
     return (
-      <div className="flex flex-wrap justify-center gap-6">
-        {sortedEvents.map((event) => (
+      <div className="relative w-full h-56 flex items-center justify-center">
+        <div className="relative w-40 h-40">
           <EventBubble
-            key={event.id}
-            event={event}
+            event={sortedEvents[0]}
             canEdit={canEdit}
-            onClick={() => onEventClick(event)}
-            onDelete={() => onEventDelete(event.id)}
+            onClick={() => onEventClick(sortedEvents[0])}
+            onDelete={() => onEventDelete(sortedEvents[0].id)}
           />
-        ))}
+        </div>
       </div>
     );
   }

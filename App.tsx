@@ -116,12 +116,12 @@ const App: React.FC = () => {
         <p className="text-slate-400 mt-6 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">L'organisation cousue main</p>
 
         <div className="max-w-5xl w-full mx-auto relative group">
-          {/* Effet Halo Vert Translucide */}
-          <div className="absolute -inset-4 bg-emerald-400/20 blur-3xl rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
-          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 blur-xl rounded-[3rem] pointer-events-none"></div>
+          {/* Effet Halo Vert - Plus proche, plus serré et transition ultra fluide */}
+          <div className="absolute -inset-1.5 bg-emerald-400/20 blur-xl rounded-[2.8rem] opacity-0 group-hover:opacity-100 transition-all duration-1000 ease-out pointer-events-none"></div>
+          <div className="absolute inset-0 bg-emerald-500/5 blur-md rounded-[2.5rem] pointer-events-none"></div>
           
-          {/* Bandeau de choix avec ombre portée verte */}
-          <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-[0_20px_50px_rgba(16,185,129,0.2)] flex flex-col md:flex-row gap-0 items-stretch border border-white/40 relative z-10">
+          {/* Bandeau de choix avec ombre fluide et élévation au survol */}
+          <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-[0_10px_40px_rgba(16,185,129,0.12)] hover:shadow-[0_20px_60px_rgba(16,185,129,0.25)] hover:-translate-y-0.5 transition-all duration-700 ease-out flex flex-col md:flex-row gap-0 items-stretch border border-white/40 relative z-10">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">NOM EVENEMENT</label>
               <input 
@@ -168,25 +168,28 @@ const App: React.FC = () => {
       </header>
 
       <main className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        {MONTHS.map((month) => (
-          <section 
-            key={month} 
-            className={`group relative flex flex-col min-h-[400px] p-8 rounded-[3.5rem] border transition-all duration-700 ${MONTH_THEMES[month].bg} ${selectedMonth === month ? 'border-emerald-400 ring-4 ring-emerald-500/10 shadow-2xl scale-[1.02]' : MONTH_THEMES[month].border} hover:shadow-xl`}
-          >
-            <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 mb-8 ${MONTH_THEMES[month].text}`}>
-              <span className={`w-2 h-8 rounded-full ${MONTH_THEMES[month].accent}`}></span>
-              {month}
-            </h2>
-            <div className="flex-1 flex flex-wrap content-start justify-center gap-6 relative z-10">
-              <BubbleStack 
-                events={events.filter(e => e.month === month)}
-                canEdit={true}
-                onEventClick={(event) => setActiveEvent(event)}
-                onEventDelete={(id) => gunNode.get(id).put(null)}
-              />
-            </div>
-          </section>
-        ))}
+        {MONTHS.map((month) => {
+          const isSelected = selectedMonth === month;
+          return (
+            <section 
+              key={month} 
+              className={`group relative flex flex-col min-h-[400px] p-8 rounded-[3.5rem] border transition-all duration-700 ${MONTH_THEMES[month].bg} ${isSelected ? 'border-emerald-500 ring-4 ring-emerald-500/20 shadow-[0_25px_60px_rgba(16,185,129,0.2)] bg-white/80' : MONTH_THEMES[month].border} hover:shadow-xl`}
+            >
+              <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 mb-8 transition-colors duration-500 ${isSelected ? 'text-emerald-900' : MONTH_THEMES[month].text}`}>
+                <span className={`rounded-full transition-all duration-500 ${isSelected ? 'w-3 h-10 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.6)]' : `w-2 h-8 ${MONTH_THEMES[month].accent}`}`}></span>
+                {month}
+              </h2>
+              <div className="flex-1 flex flex-wrap content-start justify-center gap-6 relative z-10">
+                <BubbleStack 
+                  events={events.filter(e => e.month === month)}
+                  canEdit={true}
+                  onEventClick={(event) => setActiveEvent(event)}
+                  onEventDelete={(id) => gunNode.get(id).put(null)}
+                />
+              </div>
+            </section>
+          );
+        })}
       </main>
 
       {activeEvent && (
