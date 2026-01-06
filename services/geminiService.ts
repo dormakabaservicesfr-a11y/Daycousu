@@ -7,7 +7,6 @@ export const generateEventIdeas = async (
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  // On crée l'instance ici pour s'assurer qu'elle utilise la clé la plus récente injectée dans process.env
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const basePrompt = userProvidedName 
@@ -51,7 +50,13 @@ export const generateEventIdeas = async (
     };
   } catch (error: any) {
     console.error("Erreur Gemini:", error);
-    if (error.message?.includes("API key") || error.status === 401) {
+    // Détection plus large des erreurs de clé API
+    if (
+      error.message?.includes("API key") || 
+      error.status === 401 || 
+      error.status === 403 ||
+      error.message?.includes("not found")
+    ) {
       throw new Error("KEY_NOT_FOUND");
     }
     throw error;

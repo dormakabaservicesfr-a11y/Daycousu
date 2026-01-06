@@ -8,7 +8,16 @@ import RegistrationModal from './components/RegistrationModal.tsx';
 
 declare var Gun: any;
 
-// Sous-composant pour gérer la pile d'événements d'un mois
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    aistudio?: AIStudio;
+  }
+}
+
 const MonthSection: React.FC<{
   month: string;
   events: EventData[];
@@ -95,14 +104,6 @@ const MonthSection: React.FC<{
                 </button>
               </div>
             )}
-
-            {events.length > 1 && (
-              <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-1.5 z-40">
-                {events.map((_, i) => (
-                  <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === activeIndex ? `w-4 ${theme.accent}` : 'w-1.5 bg-slate-300'}`}></div>
-                ))}
-              </div>
-            )}
           </>
         ) : null}
       </div>
@@ -118,9 +119,9 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
+  const [needsKey, setNeedsKey] = useState(false);
 
   useEffect(() => {
-    // Initialisation de Gun avec des relais publics stables
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_v2_stable_prod'); 
     setGunNode(node);
@@ -162,11 +163,24 @@ const App: React.FC = () => {
       });
       setInputName('');
       setSelectedType('');
+      setNeedsKey(false);
     } catch (err: any) {
-      console.error("Erreur lors de la création de l'événement:", err);
-      alert("Une erreur est survenue lors de la génération. Vérifiez votre clé API dans les paramètres Vercel.");
+      console.error("Erreur:", err);
+      if (err.message === "KEY_NOT_FOUND" || err.message?.includes("API key")) {
+        setNeedsKey(true);
+      } else {
+        alert("Une erreur est survenue. Vérifiez votre connexion.");
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleKeySetup = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setNeedsKey(false);
+      // On retente pas automatiquement pour éviter les boucles, l'utilisateur recliquera sur Créer.
     }
   };
 
@@ -175,7 +189,7 @@ const App: React.FC = () => {
       <header className="w-full text-center mb-16 flex flex-col items-center">
         <div className="relative mb-6 flex flex-col items-center select-none cursor-default group overflow-visible">
           <h1 className="text-7xl md:text-8xl lg:text-9xl font-black italic relative z-20">
-            <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-800 via-emerald-600 to-teal-500 drop-shadow-sm inline-block px-12 pb-6">
+            <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-800 via-emerald-600 to-teal-500 drop-shadow-sm inline-block px-14 pb-8">
               Day
             </span>
           </h1>
@@ -221,6 +235,22 @@ const App: React.FC = () => {
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <span className="tracking-[0.2em] text-[11px]">CRÉER</span>}
             </button>
           </div>
+
+          {needsKey && (
+            <div className="mt-6 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
+                <p className="text-[10px] font-bold text-rose-600 uppercase tracking-widest text-left leading-relaxed">
+                  ⚠️ Clé API non détectée sur Vercel.<br/>Connectez votre clé Gemini gratuite pour continuer.
+                </p>
+                <button 
+                  onClick={handleKeySetup}
+                  className="bg-rose-600 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-700 transition-colors shrink-0 shadow-md active:scale-95"
+                >
+                  Connecter ma clé
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
