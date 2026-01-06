@@ -7,7 +7,12 @@ export const generateEventIdeas = async (
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === "") {
+    throw new Error("KEY_NOT_FOUND");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const basePrompt = userProvidedName 
     ? `Organise un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
@@ -50,12 +55,11 @@ export const generateEventIdeas = async (
     };
   } catch (error: any) {
     console.error("Erreur Gemini:", error);
-    // Détection plus large des erreurs de clé API
     if (
       error.message?.includes("API key") || 
       error.status === 401 || 
       error.status === 403 ||
-      error.message?.includes("not found")
+      error.message?.toLowerCase().includes("not found")
     ) {
       throw new Error("KEY_NOT_FOUND");
     }
@@ -64,8 +68,11 @@ export const generateEventIdeas = async (
 };
 
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) return { name: "Lieu à définir" };
+
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Suggère un lieu réel et approprié pour l'événement "${eventTitle}" qui a lieu en ${month}. Réponds juste le nom du lieu et la ville.`,

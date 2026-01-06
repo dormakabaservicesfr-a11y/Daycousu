@@ -126,6 +126,14 @@ const App: React.FC = () => {
     const node = gun.get('day_app_v2_stable_prod'); 
     setGunNode(node);
 
+    const checkInitialKey = async () => {
+      if (!process.env.API_KEY && window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey) setNeedsKey(true);
+      }
+    };
+    checkInitialKey();
+
     node.map().on((data: any, id: string) => {
       setEvents(current => {
         if (!data) return current.filter(e => e.id !== id);
@@ -165,12 +173,9 @@ const App: React.FC = () => {
       setSelectedType('');
       setNeedsKey(false);
     } catch (err: any) {
-      console.error("Erreur:", err);
-      if (err.message === "KEY_NOT_FOUND" || err.message?.includes("API key")) {
-        setNeedsKey(true);
-      } else {
-        alert("Une erreur est survenue. Vérifiez votre connexion.");
-      }
+      console.error("Erreur de génération:", err);
+      // Sur Vercel, presque toute erreur de génération est liée à la clé API
+      setNeedsKey(true);
     } finally {
       setLoading(false);
     }
@@ -180,7 +185,6 @@ const App: React.FC = () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
       setNeedsKey(false);
-      // On retente pas automatiquement pour éviter les boucles, l'utilisateur recliquera sur Créer.
     }
   };
 
@@ -238,13 +242,13 @@ const App: React.FC = () => {
 
           {needsKey && (
             <div className="mt-6 animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
-                <p className="text-[10px] font-bold text-rose-600 uppercase tracking-widest text-left leading-relaxed">
-                  ⚠️ Clé API non détectée sur Vercel.<br/>Connectez votre clé Gemini gratuite pour continuer.
+              <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest text-left leading-relaxed">
+                  💡 Configuration requise pour l'IA<br/>Connectez votre clé Gemini gratuite pour générer des idées.
                 </p>
                 <button 
                   onClick={handleKeySetup}
-                  className="bg-rose-600 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-700 transition-colors shrink-0 shadow-md active:scale-95"
+                  className="bg-amber-600 text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-700 transition-colors shrink-0 shadow-md active:scale-95"
                 >
                   Connecter ma clé
                 </button>
