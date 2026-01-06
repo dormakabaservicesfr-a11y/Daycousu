@@ -7,16 +7,6 @@ import EventBubble from './components/EventBubble.tsx';
 import RegistrationModal from './components/RegistrationModal.tsx';
 
 declare var Gun: any;
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    // Make aistudio optional to ensure identical modifiers with other potential declarations
-    aistudio?: AIStudio;
-  }
-}
 
 // Sous-composant pour gérer la pile d'événements d'un mois
 const MonthSection: React.FC<{
@@ -128,20 +118,12 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
-  const [hasKey, setHasKey] = useState<boolean>(true); // Par défaut on tente, sinon le sélecteur s'ouvrira
 
   useEffect(() => {
+    // Initialisation de Gun avec des relais publics stables
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_v2_stable_prod'); 
     setGunNode(node);
-
-    const checkKey = async () => {
-      if (!process.env.API_KEY && window.aistudio) {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setHasKey(selected);
-      }
-    };
-    checkKey();
 
     node.map().on((data: any, id: string) => {
       setEvents(current => {
@@ -163,13 +145,6 @@ const App: React.FC = () => {
     return () => node.off();
   }, []);
 
-  const handleSelectKey = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setHasKey(true);
-    }
-  };
-
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
     setLoading(true);
@@ -188,51 +163,19 @@ const App: React.FC = () => {
       setInputName('');
       setSelectedType('');
     } catch (err: any) {
-      console.error(err);
-      if ((err.message?.includes("API key") || err.message === "KEY_NOT_FOUND") && window.aistudio) {
-        setHasKey(false);
-        await window.aistudio.openSelectKey();
-        setHasKey(true);
-      }
+      console.error("Erreur lors de la création de l'événement:", err);
+      alert("Une erreur est survenue lors de la génération. Vérifiez votre clé API dans les paramètres Vercel.");
     } finally {
       setLoading(false);
     }
   };
-
-  if (!hasKey) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
-        <div className="max-w-md w-full bg-white rounded-[3rem] p-12 shadow-2xl text-center border border-emerald-100">
-          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-8 text-4xl">✨</div>
-          <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Configuration Requise</h2>
-          <p className="text-slate-500 mb-10 text-sm leading-relaxed font-medium">
-            Pour utiliser l'IA générative gratuitement, vous devez lier votre clé API Gemini.<br/>
-            C'est simple, rapide et gratuit.
-          </p>
-          <button 
-            onClick={handleSelectKey}
-            className="w-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black py-5 rounded-[2rem] shadow-xl shadow-emerald-200 hover:-translate-y-1 transition-all active:scale-95 tracking-widest text-xs"
-          >
-            CONNECTER MA CLÉ GEMINI
-          </button>
-          <a 
-            href="https://ai.google.dev/gemini-api/docs/billing" 
-            target="_blank" 
-            className="block mt-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-emerald-600 transition-colors"
-          >
-            Aide à la configuration ↗
-          </a>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen px-4 py-12 md:py-20 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
       <header className="w-full text-center mb-16 flex flex-col items-center">
         <div className="relative mb-6 flex flex-col items-center select-none cursor-default group overflow-visible">
           <h1 className="text-7xl md:text-8xl lg:text-9xl font-black italic relative z-20">
-            <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-800 via-emerald-600 to-teal-500 drop-shadow-sm inline-block px-8 pb-4">
+            <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-800 via-emerald-600 to-teal-500 drop-shadow-sm inline-block px-12 pb-6">
               Day
             </span>
           </h1>
