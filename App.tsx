@@ -119,20 +119,11 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
-  const [needsKey, setNeedsKey] = useState(false);
 
   useEffect(() => {
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_v2_stable_prod'); 
     setGunNode(node);
-
-    const checkInitialKey = async () => {
-      if (!process.env.API_KEY && window.aistudio) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (!hasKey) setNeedsKey(true);
-      }
-    };
-    checkInitialKey();
 
     node.map().on((data: any, id: string) => {
       setEvents(current => {
@@ -171,20 +162,24 @@ const App: React.FC = () => {
       });
       setInputName('');
       setSelectedType('');
-      setNeedsKey(false);
     } catch (err: any) {
-      console.error("Erreur de génération:", err);
-      // Sur Vercel, presque toute erreur de génération est liée à la clé API
-      setNeedsKey(true);
+      console.error("Erreur détaillée:", err);
+      
+      const errorMsg = err.message || "";
+      const isAuthError = errorMsg.includes("API key") || errorMsg.includes("not found") || errorMsg.includes("401") || errorMsg.includes("403");
+
+      if (isAuthError && window.aistudio) {
+        // Dans l'environnement de preview (AI Studio)
+        alert("Clé API manquante ou invalide. Ouverture du sélecteur de clé...");
+        await window.aistudio.openSelectKey();
+      } else if (isAuthError) {
+        // Sur un déploiement Vercel standard
+        alert("Clé API Gemini non configurée.\n\nAllez dans les paramètres de votre projet Vercel et ajoutez une variable d'environnement nommée API_KEY avec votre clé gratuite.");
+      } else {
+        alert("Une erreur inattendue est survenue lors de la génération. Veuillez réessayer.");
+      }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleKeySetup = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setNeedsKey(false);
     }
   };
 
@@ -239,22 +234,6 @@ const App: React.FC = () => {
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <span className="tracking-[0.2em] text-[11px]">CRÉER</span>}
             </button>
           </div>
-
-          {needsKey && (
-            <div className="mt-6 animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
-                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest text-left leading-relaxed">
-                  💡 Configuration requise pour l'IA<br/>Connectez votre clé Gemini gratuite pour générer des idées.
-                </p>
-                <button 
-                  onClick={handleKeySetup}
-                  className="bg-amber-600 text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-700 transition-colors shrink-0 shadow-md active:scale-95"
-                >
-                  Connecter ma clé
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </header>
 
