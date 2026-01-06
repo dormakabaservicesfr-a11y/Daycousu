@@ -115,8 +115,13 @@ const App: React.FC = () => {
         
         <p className="text-slate-400 mt-6 mb-12 font-bold tracking-[0.2em] uppercase text-[10px]">L'organisation cousue main</p>
 
-        <div className="max-w-5xl w-full mx-auto">
-          <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row gap-0 items-stretch border border-white/40">
+        <div className="max-w-5xl w-full mx-auto relative group">
+          {/* Effet Halo Vert Translucide */}
+          <div className="absolute -inset-4 bg-emerald-400/20 blur-3xl rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 blur-xl rounded-[3rem] pointer-events-none"></div>
+          
+          {/* Bandeau de choix avec ombre portée verte */}
+          <div className="glass p-2 md:p-3 rounded-[2.5rem] shadow-[0_20px_50px_rgba(16,185,129,0.2)] flex flex-col md:flex-row gap-0 items-stretch border border-white/40 relative z-10">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/40 rounded-l-[2rem] transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">NOM EVENEMENT</label>
               <input 
