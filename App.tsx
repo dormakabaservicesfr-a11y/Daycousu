@@ -7,6 +7,16 @@ import EventBubble from './components/EventBubble.tsx';
 import RegistrationModal from './components/RegistrationModal.tsx';
 
 declare var Gun: any;
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    // Make aistudio optional to ensure identical modifiers with other potential declarations
+    aistudio?: AIStudio;
+  }
+}
 
 // Sous-composant pour gérer la pile d'événements d'un mois
 const MonthSection: React.FC<{
@@ -17,7 +27,6 @@ const MonthSection: React.FC<{
 }> = ({ month, events, onEventClick, onDelete }) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Initialisation par défaut sur la date la plus proche
   useEffect(() => {
     if (events.length > 0) {
       const now = new Date();
@@ -30,22 +39,17 @@ const MonthSection: React.FC<{
           const dayMatch = event.date.match(/\d+/);
           const day = dayMatch ? parseInt(dayMatch[0]) : 1;
           const monthIdx = MONTHS.indexOf(event.month);
-          
-          // On crée une date pour l'événement (au cours de l'année actuelle)
           const eventDate = new Date(currentYear, monthIdx, day);
           const diff = Math.abs(now.getTime() - eventDate.getTime());
-          
           if (diff < minDiff) {
             minDiff = diff;
             bestIndex = idx;
           }
-        } catch (e) {
-          // Ignorer en cas d'erreur de parsing
-        }
+        } catch (e) {}
       });
       setActiveIndex(bestIndex);
     }
-  }, [events.length, month]); // Se déclenche quand la liste change ou au montage du mois
+  }, [events.length, month]);
 
   const nextEvent = () => setActiveIndex((prev) => (prev + 1) % events.length);
   const prevEvent = () => setActiveIndex((prev) => (prev - 1 + events.length) % events.length);
@@ -62,7 +66,6 @@ const MonthSection: React.FC<{
       <div className="flex-1 relative flex items-center justify-center">
         {events.length > 0 ? (
           <>
-            {/* Conteneur de la pile */}
             <div className="relative w-40 h-40">
               {events.map((event, idx) => {
                 const isActive = idx === activeIndex;
@@ -79,10 +82,7 @@ const MonthSection: React.FC<{
                 }
 
                 return (
-                  <div 
-                    key={event.id}
-                    className={`absolute inset-0 transition-all duration-500 ease-out transform ${style}`}
-                  >
+                  <div key={event.id} className={`absolute inset-0 transition-all duration-500 ease-out transform ${style}`}>
                     <EventBubble 
                       event={event} 
                       canEdit={true} 
@@ -95,36 +95,21 @@ const MonthSection: React.FC<{
               })}
             </div>
 
-            {/* Navigation par flèches */}
             {events.length > 1 && (
               <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-2 z-50 pointer-events-none">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); prevEvent(); }}
-                  className="w-10 h-10 rounded-full bg-white/40 backdrop-blur-md border border-white/40 flex items-center justify-center text-slate-600 hover:bg-white/60 hover:text-emerald-600 transition-all pointer-events-auto shadow-sm active:scale-90"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                  </svg>
+                <button onClick={(e) => { e.stopPropagation(); prevEvent(); }} className="w-10 h-10 rounded-full bg-white/40 backdrop-blur-md border border-white/40 flex items-center justify-center text-slate-600 hover:bg-white/60 hover:text-emerald-600 transition-all pointer-events-auto shadow-sm active:scale-90">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); nextEvent(); }}
-                  className="w-10 h-10 rounded-full bg-white/40 backdrop-blur-md border border-white/40 flex items-center justify-center text-slate-600 hover:bg-white/60 hover:text-emerald-600 transition-all pointer-events-auto shadow-sm active:scale-90"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                  </svg>
+                <button onClick={(e) => { e.stopPropagation(); nextEvent(); }} className="w-10 h-10 rounded-full bg-white/40 backdrop-blur-md border border-white/40 flex items-center justify-center text-slate-600 hover:bg-white/60 hover:text-emerald-600 transition-all pointer-events-auto shadow-sm active:scale-90">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                 </button>
               </div>
             )}
 
-            {/* Indicateur de pagination (petits points) */}
             {events.length > 1 && (
               <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-1.5 z-40">
                 {events.map((_, i) => (
-                  <div 
-                    key={i} 
-                    className={`h-1.5 rounded-full transition-all duration-300 ${i === activeIndex ? `w-4 ${theme.accent}` : 'w-1.5 bg-slate-300'}`}
-                  ></div>
+                  <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === activeIndex ? `w-4 ${theme.accent}` : 'w-1.5 bg-slate-300'}`}></div>
                 ))}
               </div>
             )}
@@ -143,19 +128,20 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
-  const [errorInfo, setErrorInfo] = useState<{message: string, isKeyError: boolean} | null>(null);
+  const [hasKey, setHasKey] = useState<boolean>(true); // Par défaut on tente, sinon le sélecteur s'ouvrira
 
   useEffect(() => {
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
-    const node = gun.get('day_app_final_stable_v1'); 
+    const node = gun.get('day_app_v2_stable_prod'); 
     setGunNode(node);
 
-    if (!process.env.API_KEY) {
-      setErrorInfo({ 
-        message: "Clé API non détectée. Assurez-vous d'avoir configuré 'API_KEY' dans les variables d'environnement Vercel.", 
-        isKeyError: true 
-      });
-    }
+    const checkKey = async () => {
+      if (!process.env.API_KEY && window.aistudio) {
+        const selected = await window.aistudio.hasSelectedApiKey();
+        setHasKey(selected);
+      }
+    };
+    checkKey();
 
     node.map().on((data: any, id: string) => {
       setEvents(current => {
@@ -177,17 +163,20 @@ const App: React.FC = () => {
     return () => node.off();
   }, []);
 
+  const handleSelectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setHasKey(true);
+    }
+  };
+
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
-    
     setLoading(true);
-    setErrorInfo(null);
-    
     try {
       const idea = await generateEventIdeas(selectedMonth, selectedType, inputName);
       const location = await suggestLocation(idea.title, selectedMonth);
       const id = Math.random().toString(36).substr(2, 9);
-      
       gunNode.get(id).put({
         ...idea,
         type: selectedType,
@@ -200,43 +189,61 @@ const App: React.FC = () => {
       setSelectedType('');
     } catch (err: any) {
       console.error(err);
-      if (err.message === "KEY_NOT_FOUND") {
-        setErrorInfo({ message: "La clé API Gemini est absente ou invalide dans Vercel.", isKeyError: true });
-      } else {
-        setErrorInfo({ message: "Une erreur est survenue lors de la génération.", isKeyError: false });
+      if ((err.message?.includes("API key") || err.message === "KEY_NOT_FOUND") && window.aistudio) {
+        setHasKey(false);
+        await window.aistudio.openSelectKey();
+        setHasKey(true);
       }
     } finally {
       setLoading(false);
     }
   };
 
+  if (!hasKey) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+        <div className="max-w-md w-full bg-white rounded-[3rem] p-12 shadow-2xl text-center border border-emerald-100">
+          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-8 text-4xl">✨</div>
+          <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Configuration Requise</h2>
+          <p className="text-slate-500 mb-10 text-sm leading-relaxed font-medium">
+            Pour utiliser l'IA générative gratuitement, vous devez lier votre clé API Gemini.<br/>
+            C'est simple, rapide et gratuit.
+          </p>
+          <button 
+            onClick={handleSelectKey}
+            className="w-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black py-5 rounded-[2rem] shadow-xl shadow-emerald-200 hover:-translate-y-1 transition-all active:scale-95 tracking-widest text-xs"
+          >
+            CONNECTER MA CLÉ GEMINI
+          </button>
+          <a 
+            href="https://ai.google.dev/gemini-api/docs/billing" 
+            target="_blank" 
+            className="block mt-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-emerald-600 transition-colors"
+          >
+            Aide à la configuration ↗
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen px-4 py-12 md:py-20 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
       <header className="w-full text-center mb-16 flex flex-col items-center">
-        {/* Logo "Day" réduit et optimisé pour éviter le tronquage de l'italique */}
-        <div className="relative mb-6 flex flex-col items-center select-none cursor-default group">
-          <div className="relative inline-block overflow-visible px-4 py-2">
-            <h1 className="text-6xl md:text-7xl lg:text-8xl font-black italic relative z-20 overflow-visible">
-              <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-800 via-emerald-600 to-teal-500 drop-shadow-sm inline-block px-4 pb-2">
-                Day
-              </span>
-            </h1>
-          </div>
+        <div className="relative mb-6 flex flex-col items-center select-none cursor-default group overflow-visible">
+          <h1 className="text-7xl md:text-8xl lg:text-9xl font-black italic relative z-20">
+            <span className="bg-clip-text text-transparent bg-gradient-to-br from-emerald-800 via-emerald-600 to-teal-500 drop-shadow-sm inline-block px-8 pb-4">
+              Day
+            </span>
+          </h1>
         </div>
         
-        {/* Baseline : "Votre évènement cousu main" */}
         <p className="text-slate-400 mt-2 mb-12 font-bold tracking-[0.4em] uppercase text-[11px] opacity-70">
           Votre évènement cousu main
         </p>
 
-        {errorInfo && (
-          <div className="max-w-xl w-full mb-8 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left shadow-lg">
-            <p className="text-xs font-bold text-amber-800">{errorInfo.message}</p>
-          </div>
-        )}
-
         <div className="max-w-5xl w-full mx-auto p-12 pt-0">
-          <div className="bg-white/30 backdrop-blur-lg p-2 md:p-3 rounded-[2.5rem] flex flex-col md:flex-row gap-0 items-stretch border-0 ring-0 shadow-[0_0_70px_-5px_rgba(16,185,129,0.22)] hover:shadow-[0_0_90px_-5px_rgba(16,185,129,0.32)] transition-all duration-700 ease-out">
+          <div className="bg-white/30 backdrop-blur-lg p-2 md:p-3 rounded-[2.5rem] flex flex-col md:flex-row gap-0 items-stretch border border-white/40 shadow-[0_0_70px_-5px_rgba(16,185,129,0.15)] hover:shadow-[0_0_90px_-5px_rgba(16,185,129,0.25)] transition-all duration-700 ease-out">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/30 rounded-l-[2rem] transition-colors">
               <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Événement</label>
               <input 
@@ -263,7 +270,11 @@ const App: React.FC = () => {
                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <button onClick={handleAddEvent} disabled={loading || !selectedMonth || !selectedType} className={`m-1 px-10 py-4 rounded-[2rem] font-black text-white shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 ${loading || !selectedMonth || !selectedType ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-br from-emerald-500 to-teal-600 hover:shadow-emerald-200/50 hover:-translate-y-0.5'}`}>
+            <button 
+              onClick={handleAddEvent} 
+              disabled={loading || !selectedMonth || !selectedType} 
+              className={`m-1 px-10 py-4 rounded-[2rem] font-black text-white shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 ${loading || !selectedMonth || !selectedType ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-br from-emerald-500 to-teal-600 hover:shadow-emerald-200/50 hover:-translate-y-0.5'}`}
+            >
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <span className="tracking-[0.2em] text-[11px]">CRÉER</span>}
             </button>
           </div>
@@ -289,24 +300,20 @@ const App: React.FC = () => {
           onClose={() => setActiveEvent(null)} 
           onRegister={(name) => {
             const updated = [...(activeEvent.attendees || []), name];
-            gunNode.get(activeEvent.id).get('attendees').put(JSON.stringify(updated));
-            setActiveEvent({ ...activeEvent, attendees: updated });
+            gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
           }} 
           onUnregister={(index) => {
             const updated = [...(activeEvent.attendees || [])];
             updated.splice(index, 1);
-            gunNode.get(activeEvent.id).get('attendees').put(JSON.stringify(updated));
-            setActiveEvent({ ...activeEvent, attendees: updated });
+            gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
           }}
           onUpdateLocation={(loc) => { 
             const updated = { name: loc, mapsUri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}` }; 
-            gunNode.get(activeEvent.id).get('location').put(JSON.stringify(updated)); 
-            setActiveEvent({...activeEvent, location: updated}); 
+            gunNode.get(activeEvent.id).put({ location: JSON.stringify(updated) }); 
           }}
-          // Fix: Removed duplicate onUpdateDate attribute which caused a JSX error
-          onUpdateDate={(val) => { gunNode.get(activeEvent.id).get('date').put(val); setActiveEvent({...activeEvent, date: val}); }}
-          onUpdateDescription={(val) => { gunNode.get(activeEvent.id).get('description').put(val); setActiveEvent({...activeEvent, description: val}); }}
-          onUpdateMaxParticipants={(val) => { gunNode.get(activeEvent.id).get('maxParticipants').put(val); setActiveEvent({...activeEvent, maxParticipants: val}); }}
+          onUpdateDate={(val) => gunNode.get(activeEvent.id).put({ date: val })}
+          onUpdateDescription={(val) => gunNode.get(activeEvent.id).put({ description: val })}
+          onUpdateMaxParticipants={(val) => gunNode.get(activeEvent.id).put({ maxParticipants: val })}
         />
       )}
     </div>

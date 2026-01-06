@@ -7,7 +7,7 @@ export const generateEventIdeas = async (
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  // Fix: Initialize GoogleGenAI with process.env.API_KEY as a named parameter
+  // On crée l'instance ici pour s'assurer qu'elle utilise la clé la plus récente injectée dans process.env
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const basePrompt = userProvidedName 
@@ -43,7 +43,6 @@ export const generateEventIdeas = async (
       },
     });
 
-    // Fix: Access response.text directly (it is a property, not a method)
     const data = JSON.parse(response.text || "{}");
     return { 
       ...data, 
@@ -61,14 +60,12 @@ export const generateEventIdeas = async (
 
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
   try {
-    // Fix: Initialize GoogleGenAI with process.env.API_KEY directly
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Suggère un lieu réel et approprié pour l'événement "${eventTitle}" qui a lieu en ${month}. Réponds juste le nom du lieu et la ville.`,
     });
 
-    // Fix: Access response.text directly
     const locationName = response.text?.trim() || "Lieu à définir";
     
     return { 
