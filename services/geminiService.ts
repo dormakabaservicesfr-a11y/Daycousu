@@ -1,36 +1,37 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { EventType, GeminiEventResponse, EventLocation } from "../types.ts";
+import { EventType, GeminiEventResponse, EventLocation } from "../types";
 
-/**
- * Service de génération d'idées d'événements via Gemini 3 Flash.
- * Utilise strictement process.env.API_KEY.
- */
+// Déclaration pour informer TypeScript que 'process.env' est injecté par le bundler
+declare var process: {
+  env: {
+    API_KEY: string;
+    [key: string]: string | undefined;
+  };
+};
+
 export const generateEventIdeas = async (
   month: string, 
   type: EventType, 
   userProvidedName?: string
 ): Promise<GeminiEventResponse> => {
-  // Initialisation conforme aux guidelines
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) throw new Error("KEY_NOT_FOUND");
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const basePrompt = userProvidedName 
     ? `Organise un événement nommé "${userProvidedName}" pour le mois de ${month} de type "${type}".`
-    : `Génère une idée d'événement inédite et excitante pour le mois de ${month} (${type}).`;
+    : `Génère une idée d'événement inédite et excitante pour ${month} (${type}).`;
 
-  const instructions = `${basePrompt} 
-    Détails requis en français : 
-    - Titre accrocheur et court.
-    - Date logique au format "JOUR MOIS" (ex: "15 ${month}").
-    - Description immersive et chaleureuse (140 car. max).
-    - Un emoji thématique pertinent.
-    - Nombre de participants maximum (entre 3 et 10).
-    Réponds exclusivement au format JSON.`;
+  const prompt = `${basePrompt} 
+    Détails requis : Titre accrocheur, date logique en ${month}, description immersive (140 car. max), un emoji thématique.
+    Participants max : 4.
+    Réponds exclusivement en JSON.`;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: instructions,
+      contents: prompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -47,31 +48,30 @@ export const generateEventIdeas = async (
       },
     });
 
-    // Accès direct à .text (propriété, pas méthode)
-    const text = response.text;
-    if (!text) throw new Error("Réponse de l'IA vide.");
-
-    const data = JSON.parse(text);
+    const data = JSON.parse(response.text || "{}");
     return { 
       ...data, 
       maxParticipants: data.maxParticipants || 4, 
       isAiGenerated: true 
     };
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error("Erreur Gemini:", error);
+    if (error.message?.includes("API key") || error.status === 401) {
+      throw new Error("KEY_NOT_FOUND");
+    }
     throw error;
   }
 };
 
-/**
- * Suggère un lieu pertinent basé sur le titre de l'événement.
- */
 export const suggestLocation = async (eventTitle: string, month: string): Promise<EventLocation | undefined> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return { name: "Lieu à définir" };
+
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Suggère un lieu réel (nom et ville) pour l'événement "${eventTitle}" en ${month}. Réponds uniquement le nom du lieu et la ville.`,
+      contents: `Suggère un lieu réel et approprié pour l'événement "${eventTitle}" qui a lieu en ${month}. Réponds juste le nom du lieu et la ville.`,
     });
 
     const locationName = response.text?.trim() || "Lieu à définir";
