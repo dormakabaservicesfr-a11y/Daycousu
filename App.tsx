@@ -6,6 +6,7 @@ import { generateEventIdeas, suggestLocation } from './services/geminiService.ts
 import EventBubble from './components/EventBubble.tsx';
 import RegistrationModal from './components/RegistrationModal.tsx';
 
+// Gun est importé via script tag dans index.html
 declare var Gun: any;
 
 const MonthSection: React.FC<{
@@ -95,7 +96,9 @@ const MonthSection: React.FC<{
               </div>
             )}
           </>
-        ) : null}
+        ) : (
+          <div className="text-slate-300 text-[10px] font-bold uppercase tracking-widest opacity-40">Aucun événement</div>
+        )}
       </div>
     </section>
   );
@@ -111,6 +114,7 @@ const App: React.FC = () => {
   const [gunNode, setGunNode] = useState<any>(null);
 
   useEffect(() => {
+    // Initialisation de Gun avec des relais persistants
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_v2_stable_prod'); 
     setGunNode(node);
@@ -139,10 +143,12 @@ const App: React.FC = () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
     setLoading(true);
     try {
+      // Appel au service Gemini
       const idea = await generateEventIdeas(selectedMonth, selectedType, inputName);
       const location = await suggestLocation(idea.title, selectedMonth);
       const id = Math.random().toString(36).substr(2, 9);
       
+      // Sauvegarde dans Gun.js
       gunNode.get(id).put({
         ...idea,
         type: selectedType,
@@ -152,17 +158,20 @@ const App: React.FC = () => {
         isAiGenerated: 'true'
       });
 
+      // Reset formulaire
       setInputName('');
       setSelectedType('');
+      // Notification succès via console
+      console.log("Événement créé avec succès !");
     } catch (err: any) {
       console.error("Erreur de création:", err);
       const errorMsg = err.message || "";
       
-      // Message d'erreur spécifique pour le déploiement Vercel
-      if (errorMsg.includes("API key") || errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("not found")) {
-        alert("Configuration requise : Veuillez ajouter votre clé API Gemini dans les variables d'environnement de votre projet Vercel sous le nom 'API_KEY'.");
+      // Détection spécifique pour Vercel
+      if (errorMsg.includes("API key") || errorMsg.includes("401") || errorMsg.includes("403")) {
+        alert("Action requise : Votre clé API Gemini n'est pas configurée.\n\nAllez dans les paramètres de votre projet Vercel > Environment Variables et ajoutez la clé 'API_KEY' avec votre token Gemini gratuit.");
       } else {
-        alert("Oups ! Une erreur est survenue lors de la génération de l'idée. Vérifiez votre connexion.");
+        alert("Oups ! Une erreur réseau est survenue. Vérifiez votre connexion internet.");
       }
     } finally {
       setLoading(false);
@@ -180,19 +189,19 @@ const App: React.FC = () => {
           </h1>
         </div>
         
-        <p className="text-slate-400 mt-2 mb-12 font-bold tracking-[0.4em] uppercase text-[11px] opacity-70">
-          Votre évènement cousu main 🪡
+        <p className="text-slate-400 mt-2 mb-12 font-bold tracking-[0.4em] uppercase text-[11px] opacity-70 flex items-center gap-2">
+          Votre évènement cousu main <span className="text-emerald-500 animate-pulse">🪡</span>
         </p>
 
         <div className="max-w-5xl w-full mx-auto p-12 pt-0">
           <div className="bg-white/30 backdrop-blur-lg p-2 md:p-3 rounded-[2.5rem] flex flex-col md:flex-row gap-0 items-stretch border border-white/40 shadow-[0_0_70px_-5px_rgba(16,185,129,0.15)] hover:shadow-[0_0_90px_-5px_rgba(16,185,129,0.25)] transition-all duration-700 ease-out">
             <div className="flex-[2] flex flex-col justify-center px-6 py-2 group focus-within:bg-white/30 rounded-l-[2rem] transition-colors">
-              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Événement</label>
+              <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-left opacity-70">Thématique (Optionnel)</label>
               <input 
                 type="text" 
                 value={inputName} 
                 onChange={(e) => setInputName(e.target.value)} 
-                placeholder="Ex: Soirée jeux, Brunch..." 
+                placeholder="Ex: Soirée jeux, Brunch chic..." 
                 className="bg-transparent w-full outline-none font-bold text-slate-700 text-sm placeholder:text-slate-400/40" 
               />
             </div>
@@ -217,7 +226,11 @@ const App: React.FC = () => {
               disabled={loading || !selectedMonth || !selectedType} 
               className={`m-1 px-10 py-4 rounded-[2rem] font-black text-white shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 ${loading || !selectedMonth || !selectedType ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-br from-emerald-500 to-teal-600 hover:shadow-emerald-200/50 hover:-translate-y-0.5'}`}
             >
-              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <span className="tracking-[0.2em] text-[11px]">CRÉER</span>}
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                <span className="tracking-[0.2em] text-[11px]">CRÉER</span>
+              )}
             </button>
           </div>
         </div>
@@ -241,11 +254,13 @@ const App: React.FC = () => {
           canEdit={true} 
           onClose={() => setActiveEvent(null)} 
           onRegister={(name) => {
-            const updated = [...(activeEvent.attendees || []), name];
+            const currentAttendees = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
+            const updated = [...currentAttendees, name];
             gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
           }} 
           onUnregister={(index) => {
-            const updated = [...(activeEvent.attendees || [])];
+            const currentAttendees = Array.isArray(activeEvent.attendees) ? activeEvent.attendees : [];
+            const updated = [...currentAttendees];
             updated.splice(index, 1);
             gunNode.get(activeEvent.id).put({ attendees: JSON.stringify(updated) });
           }}
