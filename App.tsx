@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MONTHS, EVENT_TYPES, MONTH_THEMES } from './constants';
 import { EventType, EventData } from './types';
 import { generateEventIdeas, suggestLocation } from './services/geminiService';
 import BubbleStack from './components/BubbleStack';
 import RegistrationModal from './components/RegistrationModal';
+import ArchiveModal from './components/ArchiveModal';
 
 // Gun est chargé via index.html
 declare var Gun: any;
@@ -17,21 +18,19 @@ const App: React.FC = () => {
   const [selectedType, setSelectedType] = useState<EventType | ''>('');
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [gunNode, setGunNode] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Initialisation de Gun avec des relais publics
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
     const node = gun.get('day_app_prod_v4_final_stable'); 
     setGunNode(node);
 
-    // Écoute du logo dans la base de données
     node.get('settings').get('logo').on((data: string) => {
       if (data) setSiteLogo(data);
     });
 
-    // Écoute des événements
     node.map().on((data: any, id: string) => {
       if (id === 'settings') return;
       setEvents(current => {
@@ -57,6 +56,30 @@ const App: React.FC = () => {
     return () => node.off();
   }, []);
 
+  // Logique de péremption : Calculer quels événements sont "archivés" (> 2 mois passés)
+  const { currentEvents, archivedEvents } = useMemo(() => {
+    const now = new Date();
+    const currentMonthIndex = now.getMonth();
+    
+    const active: EventData[] = [];
+    const archived: EventData[] = [];
+
+    events.forEach(event => {
+      const monthIdx = MONTHS.indexOf(event.month);
+      // Si le mois de l'événement est dans le passé de l'année en cours
+      // et que la différence est strictement supérieure à 2
+      const isTooOld = monthIdx < currentMonthIndex && (currentMonthIndex - monthIdx) > 2;
+      
+      if (isTooOld) {
+        archived.push(event);
+      } else {
+        active.push(event);
+      }
+    });
+
+    return { currentEvents: active, archivedEvents: archived };
+  }, [events]);
+
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !gunNode) return;
@@ -69,17 +92,14 @@ const App: React.FC = () => {
         const MAX_WIDTH = 800;
         let width = img.width;
         let height = img.height;
-
         if (width > MAX_WIDTH) {
           height *= MAX_WIDTH / width;
           width = MAX_WIDTH;
         }
-
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        
         const optimizedBase64 = canvas.toDataURL('image/webp', 0.85);
         setSiteLogo(optimizedBase64);
         gunNode.get('settings').get('logo').put(optimizedBase64);
@@ -109,6 +129,7 @@ const App: React.FC = () => {
 
       setInputName('');
       setSelectedType('');
+      setSelectedMonth('');
     } catch (err: any) {
       console.error("Erreur de création:", err);
       alert("Oups ! Erreur lors de la création de l'événement.");
@@ -118,18 +139,16 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen px-4 pt-4 md:pt-12 pb-24 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
-      <header className="w-full text-center mb-10 md:mb-12 flex flex-col items-center">
+    <div className="min-h-screen px-4 pt-2 md:pt-6 pb-32 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden relative">
+      <header className="w-full text-center mb-5 md:mb-6 flex flex-col items-center">
         
-        {/* Zone du Logo - Verrouillée une fois le logo présent */}
         <div 
-          className={`relative mb-6 transition-all duration-500 ${!siteLogo ? 'group cursor-pointer' : ''}`}
+          className={`relative mb-1 transition-all duration-500 ${!siteLogo ? 'group cursor-pointer' : ''}`}
           onClick={!siteLogo ? () => fileInputRef.current?.click() : undefined}
         >
           <div className="max-w-[240px] md:max-w-[304px] relative">
             {siteLogo ? (
               <div className="relative">
-                {/* Effet de lueur derrière le logo - Toujours présent mais statique */}
                 <div className="absolute inset-0 bg-emerald-500/10 blur-3xl rounded-full scale-110 opacity-50"></div>
                 <img 
                   src={siteLogo} 
@@ -144,7 +163,6 @@ const App: React.FC = () => {
               </div>
             )}
             
-            {/* Badge d'édition - Retiré une fois le logo présent */}
             {!siteLogo && (
               <div className="absolute -bottom-2 -right-2 bg-emerald-600 text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0 z-20">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -154,17 +172,10 @@ const App: React.FC = () => {
               </div>
             )}
           </div>
-          
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            accept="image/*" 
-            onChange={handleLogoUpload} 
-          />
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
         </div>
         
-        <p className="text-slate-400 mt-2 mb-8 font-bold tracking-[0.3em] uppercase text-[10px] opacity-70">L'organisation cousue main</p>
+        <p className="text-slate-400 mt-0 mb-4 font-bold tracking-[0.3em] uppercase text-[10px] opacity-70">L'organisation cousue main</p>
 
         <div className="max-w-5xl w-full mx-auto relative group">
           <div className="absolute -inset-1.5 bg-emerald-400/20 blur-xl rounded-[2.8rem] opacity-0 group-hover:opacity-100 transition-all duration-1000 ease-out pointer-events-none"></div>
@@ -219,6 +230,8 @@ const App: React.FC = () => {
       <main className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-20 md:gap-8 snap-y snap-mandatory">
         {MONTHS.map((month) => {
           const isSelected = selectedMonth === month;
+          const monthEvents = currentEvents.filter(e => e.month === month);
+          
           return (
             <section 
               key={month} 
@@ -230,7 +243,7 @@ const App: React.FC = () => {
               </h2>
               <div className="flex-1 flex flex-wrap content-center justify-center gap-4 md:gap-6 relative z-10">
                 <BubbleStack 
-                  events={events.filter(e => e.month === month)}
+                  events={monthEvents}
                   canEdit={true}
                   onEventClick={(event) => setActiveEvent(event)}
                   onEventDelete={(id) => gunNode.get(id).put(null)}
@@ -240,6 +253,20 @@ const App: React.FC = () => {
           );
         })}
       </main>
+
+      {/* Bouton d'Archive en bas de page */}
+      {archivedEvents.length > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[40]">
+          <button 
+            onClick={() => setIsArchiveOpen(true)}
+            className="group flex items-center gap-3 bg-white/70 backdrop-blur-md px-8 py-4 rounded-full shadow-[0_15px_40px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_50px_rgba(16,185,129,0.2)] border border-white/50 transition-all hover:-translate-y-1 active:scale-95"
+          >
+            <span className="text-xl group-hover:rotate-12 transition-transform duration-300">📁</span>
+            <span className="text-[11px] font-black text-slate-600 uppercase tracking-widest">Anciens événements</span>
+            <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-bold rounded-full">{archivedEvents.length}</span>
+          </button>
+        </div>
+      )}
 
       {activeEvent && (
         <RegistrationModal 
@@ -267,6 +294,13 @@ const App: React.FC = () => {
           onUpdateDate={(val) => { gunNode.get(activeEvent.id).put({ date: val }); setActiveEvent({...activeEvent, date: val}); }}
           onUpdateDescription={(val) => { gunNode.get(activeEvent.id).put({ description: val }); setActiveEvent({...activeEvent, description: val}); }}
           onUpdateMaxParticipants={(val) => { gunNode.get(activeEvent.id).put({ maxParticipants: val }); setActiveEvent({...activeEvent, maxParticipants: val}); }}
+        />
+      )}
+
+      {isArchiveOpen && (
+        <ArchiveModal 
+          events={archivedEvents} 
+          onClose={() => setIsArchiveOpen(false)} 
         />
       )}
     </div>
