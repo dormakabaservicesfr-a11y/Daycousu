@@ -11,19 +11,29 @@ declare var Gun: any;
 
 const App: React.FC = () => {
   const [events, setEvents] = useState<EventData[]>([]);
+  const [siteLogo, setSiteLogo] = useState<string | null>(null);
   const [inputName, setInputName] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [selectedType, setSelectedType] = useState<EventType | ''>('');
   const [loading, setLoading] = useState(false);
   const [activeEvent, setActiveEvent] = useState<EventData | null>(null);
   const [gunNode, setGunNode] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Initialisation de Gun avec des relais publics
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
-    const node = gun.get('day_app_prod_v2_stable'); 
+    const node = gun.get('day_app_prod_v4_final_stable'); 
     setGunNode(node);
 
+    // Écoute du logo dans la base de données
+    node.get('settings').get('logo').on((data: string) => {
+      if (data) setSiteLogo(data);
+    });
+
+    // Écoute des événements
     node.map().on((data: any, id: string) => {
+      if (id === 'settings') return;
       setEvents(current => {
         if (!data) return current.filter(e => e.id !== id);
         try {
@@ -47,6 +57,38 @@ const App: React.FC = () => {
     return () => node.off();
   }, []);
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !gunNode) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        const optimizedBase64 = canvas.toDataURL('image/webp', 0.85);
+        setSiteLogo(optimizedBase64);
+        gunNode.get('settings').get('logo').put(optimizedBase64);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleAddEvent = async () => {
     if (!selectedMonth || !selectedType || !gunNode) return;
     setLoading(true);
@@ -69,11 +111,7 @@ const App: React.FC = () => {
       setSelectedType('');
     } catch (err: any) {
       console.error("Erreur de création:", err);
-      if (err.message === "API_KEY_MISSING") {
-        alert("La clé API Gemini (API_KEY) n'est pas configurée.");
-      } else {
-        alert("Oups ! Erreur lors de la création de l'événement.");
-      }
+      alert("Oups ! Erreur lors de la création de l'événement.");
     } finally {
       setLoading(false);
     }
@@ -82,16 +120,45 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen px-4 pt-4 md:pt-12 pb-24 flex flex-col items-center max-w-[1700px] mx-auto overflow-x-hidden">
       <header className="w-full text-center mb-10 md:mb-12 flex flex-col items-center">
-        <div className="relative mb-6 select-none max-w-[320px] md:max-w-[400px]">
-          {/* Intégration de l'image logo.png */}
-          <img 
-            src="logo.png" 
-            alt="Day Logo" 
-            className="w-full h-auto drop-shadow-md pointer-events-none"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.parentElement!.style.display = 'none';
-            }}
+        
+        {/* Zone du Logo Interactive - Taille réduite de 20% */}
+        <div 
+          className="relative mb-6 group cursor-pointer transition-all duration-500"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <div className="max-w-[240px] md:max-w-[304px] relative">
+            {siteLogo ? (
+              <div className="relative">
+                {/* Effet de lueur derrière le logo */}
+                <div className="absolute inset-0 bg-emerald-500/10 blur-3xl rounded-full scale-110 opacity-50"></div>
+                <img 
+                  src={siteLogo} 
+                  alt="Day Logo" 
+                  className="w-full h-auto drop-shadow-2xl relative z-10 transition-transform group-hover:scale-[1.03]"
+                />
+              </div>
+            ) : (
+              <div className="w-56 h-28 border-4 border-dashed border-emerald-200/40 rounded-[2rem] flex flex-col items-center justify-center bg-white/30 backdrop-blur-sm hover:bg-white/50 hover:border-emerald-300 transition-all">
+                 <div className="text-emerald-500 font-black text-3xl mb-0.5 tracking-tighter">Day<span className="text-emerald-300">🪡</span></div>
+                 <div className="text-[8px] font-bold text-emerald-600/60 uppercase tracking-[0.2em]">Cliquer pour ajouter votre logo</div>
+              </div>
+            )}
+            
+            {/* Badge d'édition au survol */}
+            <div className="absolute -bottom-2 -right-2 bg-emerald-600 text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0 z-20">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+          </div>
+          
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*" 
+            onChange={handleLogoUpload} 
           />
         </div>
         
