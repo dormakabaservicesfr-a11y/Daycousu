@@ -14,7 +14,6 @@ interface BubbleStackProps {
 const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick, onEventDelete }) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Helper pour parser la date "JOUR MOIS"
   const parseEventDate = (dateStr: string): Date => {
     const now = new Date();
     const [dayStr, monthStr] = dateStr.split(' ');
@@ -24,7 +23,6 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
     return new Date(now.getFullYear(), monthIndex, day);
   };
 
-  // Tri des événements : Futurs d'abord (du plus proche au plus lointain), puis Passés (du plus récent au plus ancien)
   const sortedEvents = useMemo(() => {
     const now = new Date();
     const nowTime = now.getTime();
@@ -36,7 +34,6 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
       if (monthIndex === -1 || isNaN(day)) return true;
       
       const eventDate = new Date(now.getFullYear(), monthIndex, day);
-      // Un événement est expiré 24h après le début de sa journée (même logique que EventBubble)
       const threshold = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000);
       return nowTime > threshold.getTime();
     };
@@ -52,7 +49,6 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
     return [...upcoming, ...expired];
   }, [events]);
 
-  // Réinitialiser l'index si la liste change (pour rester sur l'événement prioritaire par défaut)
   useEffect(() => {
     setActiveIndex(0);
   }, [events.length]);
@@ -69,10 +65,9 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
     setActiveIndex((prev) => (prev - 1 + sortedEvents.length) % sortedEvents.length);
   };
 
-  // Si seulement 1 événement, on l'affiche centré dans le même conteneur de hauteur fixe que la pile
   if (sortedEvents.length < 2) {
     return (
-      <div className="relative w-full h-56 flex items-center justify-center">
+      <div className="relative w-full h-64 md:h-56 flex items-center justify-center">
         <div className="relative w-40 h-40">
           <EventBubble
             event={sortedEvents[0]}
@@ -85,35 +80,30 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
     );
   }
 
-  // Si 2 ou plus, on active l'empilement (Stack)
   const visibleEvents = [];
   const count = sortedEvents.length;
-  // On affiche jusqu'à 3 bulles dans l'aperçu de la pile
   for (let i = 0; i < Math.min(count, 3); i++) {
     const index = (activeIndex + i) % count;
     visibleEvents.push({ event: sortedEvents[index], isBackground: i > 0, depth: i });
   }
 
   return (
-    <div className="relative w-full h-56 flex items-center justify-center select-none group/stack">
-      {/* Flèches de navigation - visibles au survol */}
+    <div className="relative w-full h-64 md:h-56 flex items-center justify-center select-none group/stack">
       <button 
         onClick={prev}
-        className="absolute left-[-20px] z-[70] p-2.5 bg-white/90 backdrop-blur hover:bg-white rounded-full shadow-xl transition-all active:scale-90 opacity-0 group-hover/stack:opacity-100 border border-slate-100"
+        className="absolute left-[-15px] md:left-[-20px] z-[70] p-2 bg-white/90 backdrop-blur hover:bg-white rounded-full shadow-xl transition-all active:scale-90 opacity-0 group-hover/stack:opacity-100 border border-slate-100"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 md:h-6 md:w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
         </svg>
       </button>
 
       <div className="relative flex items-center justify-center w-40 h-40">
-        {/* On affiche les bulles : les plus profondes d'abord (plus à gauche) */}
         {visibleEvents.reverse().map(({ event, isBackground, depth }) => (
           <div 
             key={event.id}
             className="absolute transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             style={{ 
-              // Décalage horizontal augmenté de 10% supplémentaire (16.5px -> 18.15px)
               transform: isBackground 
                 ? `translateX(-${depth * 18.15}px) scale(${1 - depth * 0.05})` 
                 : 'translateX(0) scale(1)',
@@ -134,19 +124,18 @@ const BubbleStack: React.FC<BubbleStackProps> = ({ events, canEdit, onEventClick
 
       <button 
         onClick={next}
-        className="absolute right-[-20px] z-[70] p-2.5 bg-white/90 backdrop-blur hover:bg-white rounded-full shadow-xl transition-all active:scale-90 opacity-0 group-hover/stack:opacity-100 border border-slate-100"
+        className="absolute right-[-15px] md:right-[-20px] z-[70] p-2 bg-white/90 backdrop-blur hover:bg-white rounded-full shadow-xl transition-all active:scale-90 opacity-0 group-hover/stack:opacity-100 border border-slate-100"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 md:h-6 md:w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
         </svg>
       </button>
 
-      {/* Indicateur de pagination */}
-      <div className="absolute -bottom-6 flex gap-1.5">
+      <div className="absolute -bottom-4 md:-bottom-6 flex gap-1.5">
         {sortedEvents.map((_, idx) => (
           <div 
             key={idx}
-            className={`h-1.5 rounded-full transition-all duration-500 ${idx === activeIndex ? 'w-5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'w-1.5 bg-slate-300'}`}
+            className={`h-1 rounded-full transition-all duration-500 ${idx === activeIndex ? 'w-4 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'w-1 bg-slate-300'}`}
           />
         ))}
       </div>
